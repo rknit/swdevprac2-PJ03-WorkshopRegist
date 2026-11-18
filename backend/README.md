@@ -135,12 +135,13 @@ Successful responses use `{ success: true, data }`, with `count` for lists. Regi
   "instructor": "Example Instructor",
   "workshopDate": "2026-12-01",
   "startTime": "13:00",
+  "coverImage": "https://picsum.photos/id/1/1200/600",
   "location": "Training room A",
   "capacity": 20
 }
 ```
 
-Use a date that is today or later when trying this example. `startTime` is optional. It uses `HH:mm` (24-hour) in Asia/Bangkok time and does not change any date rule.
+Use a date that is today or later when trying this example. `startTime` is optional. It uses `HH:mm` (24-hour) in Asia/Bangkok time and does not change any date rule. `coverImage` is optional: an `http(s)` URL for the workshop banner image.
 
 ### Registration Request Example
 

@@ -18,6 +18,8 @@ export type Workshop = {
   workshopDate: string;
   // Optional "HH:mm" start time, Asia/Bangkok.
   startTime?: string | null;
+  // Optional banner image (http(s) URL) for the card cover and the detail banner.
+  coverImage?: string | null;
   location: string;
   capacity: number;
   registeredCount?: number;
@@ -36,7 +38,7 @@ export type UserRow = {
 
 export type Registration = {
   _id: string;
-  workshop: Pick<Workshop, "_id" | "name" | "description" | "instructor" | "workshopDate" | "startTime" | "location" | "capacity" | "registeredCount" | "isActive"> | null;
+  workshop: Pick<Workshop, "_id" | "name" | "description" | "instructor" | "workshopDate" | "startTime" | "coverImage" | "location" | "capacity" | "registeredCount" | "isActive"> | null;
   user: { _id: string; name: string; email: string; tel: string; role: string } | null;
   createdAt: string;
 };

@@ -39,4 +39,20 @@ function parseStartTime(startTime) {
   return { given: true, startTime };
 }
 
-module.exports = { bangkokTodayStart, parseWorkshopDate, parseStartTime };
+// Parses an optional banner image URL. undefined means "not given";
+// null or "" clears it. Only http(s) URLs are accepted.
+function parseCoverImage(coverImage) {
+  if (coverImage === undefined) return { given: false };
+  if (coverImage === null || coverImage === "") return { given: true, coverImage: null };
+  if (typeof coverImage !== "string") return { error: "coverImage must be an http(s) URL" };
+  const value = coverImage.trim();
+  if (value.length > 2048 || !/^https?:\/\/\S+$/i.test(value)) return { error: "coverImage must be an http(s) URL" };
+  try {
+    new URL(value);
+  } catch {
+    return { error: "coverImage must be an http(s) URL" };
+  }
+  return { given: true, coverImage: value };
+}
+
+module.exports = { bangkokTodayStart, parseWorkshopDate, parseStartTime, parseCoverImage };

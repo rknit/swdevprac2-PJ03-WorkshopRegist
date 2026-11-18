@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, type ButtonHTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import type { Workshop } from "../../lib/api";
 import { avatarColour, fillRatio, initials, isFull, isNearlyFull, isPast } from "../../lib/format";
 
@@ -20,6 +20,30 @@ export function Icon({ name, size = 24, flip = false }: { name: IconName; size?:
       height={size}
       unoptimized
       className={flip ? "icon icon-flip" : "icon"}
+    />
+  );
+}
+
+/* ---------- Cover image (workshop banner) ---------- */
+
+// Fills its positioned parent. A URL that fails to load shows nothing, so the
+// parent's plain cover colour shows through. Admin-entered URLs can point to
+// any host, so the image is not passed through the Next.js optimizer.
+export function CoverImage({ src, className, onError }: { src: string | null | undefined; className: string; onError?: () => void }) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  if (!src || failedSrc === src) return null;
+  return (
+    <Image
+      src={src}
+      alt=""
+      aria-hidden
+      fill
+      unoptimized
+      className={className}
+      onError={() => {
+        setFailedSrc(src);
+        onError?.();
+      }}
     />
   );
 }

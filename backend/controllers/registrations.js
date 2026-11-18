@@ -7,7 +7,7 @@ const { bangkokTodayStart } = require("../lib/dates");
 const MAX_ACTIVE = 3;
 
 const populateRegistration = (query) => query
-  .populate("workshop", "name description instructor workshopDate startTime location capacity registeredCount isActive")
+  .populate("workshop", "name description instructor workshopDate startTime coverImage location capacity registeredCount isActive")
   .populate("user", "name email tel role");
 
 // The Bangkok calendar day (UTC+7) is the "today" for all date rules.

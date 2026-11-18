@@ -15,6 +15,14 @@ const WorkshopSchema = new mongoose.Schema(
       match: [/^([01]\d|2[0-3]):[0-5]\d$/, "Start time must use HH:mm (24-hour) format"],
     },
     location: { type: String, required: [true, "Please add a location"], trim: true },
+    // Optional banner image for the workshop card and detail page: an http(s) URL.
+    coverImage: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: [2048, "Cover image URL is too long"],
+      match: [/^https?:\/\/\S+$/i, "Cover image must be an http(s) URL"],
+    },
     capacity: {
       type: Number,
       required: [true, "Please add a capacity"],

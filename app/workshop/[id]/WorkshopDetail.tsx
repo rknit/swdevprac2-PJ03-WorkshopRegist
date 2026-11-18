@@ -1,13 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, type Registration, type Workshop } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { coverFor, dateLong, errorText, isFull, isPast, onCover, seatsLeft } from "../../../lib/format";
 import { useToday } from "../../../lib/hooks";
-import { Badge, Button, ButtonLink, CapacityBar, Icon, StatePanel, workshopStatus } from "../../components/ui";
+import { Badge, Button, ButtonLink, CapacityBar, CoverImage, Icon, StatePanel, workshopStatus } from "../../components/ui";
 
 // The spec limits a member to 3 registrations on active (today or later) workshops.
 const MAX_ACTIVE = 3;
@@ -18,6 +17,7 @@ export function WorkshopDetail({ id }: { id: string }) {
   const [notFound, setNotFound] = useState(false);
   const [mineState, setMine] = useState<Registration[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const today = useToday();
   const isMember = user?.role === "member";
@@ -92,6 +92,7 @@ export function WorkshopDetail({ id }: { id: string }) {
   }
 
   const cover = coverFor(workshop._id);
+  const hasImage = Boolean(workshop.coverImage) && !imageFailed;
   const past = today ? isPast(workshop, today) : false;
   const registered = Boolean(mine?.some((r) => r.workshop?._id === workshop._id));
   const activeCount = mine ? mine.filter((r) => r.workshop && r.workshop.isActive && today && !isPast(r.workshop, today)).length : 0;
@@ -102,13 +103,11 @@ export function WorkshopDetail({ id }: { id: string }) {
     <div className="page" style={{ paddingTop: 32 }}>
       <BackLink />
 
-      <section className="banner" style={{ background: cover.bg }} aria-labelledby="workshop-title">
-        <Image className="banner-shape banner-ellipse-lg" src="/figma/banner-ellipse-lg.svg" alt="" aria-hidden width={300} height={300} unoptimized loading="eager" />
-        <div className="banner-square" aria-hidden />
-        <Image className="banner-shape banner-ellipse-sm" src="/figma/banner-ellipse-sm.svg" alt="" aria-hidden width={120} height={120} unoptimized loading="eager" />
+      <section className={hasImage ? "banner has-image" : "banner"} style={{ background: cover.bg }} aria-labelledby="workshop-title">
+        <CoverImage src={workshop.coverImage} className="cover-image" onError={() => setImageFailed(true)} />
         <div className="banner-text">
           <Badge status={status.status}>{status.label}</Badge>
-          <h1 id="workshop-title" className="t-display-l banner-title" style={{ color: onCover(cover.bg) }}>
+          <h1 id="workshop-title" className="t-display-l banner-title" style={{ color: hasImage ? "var(--white)" : onCover(cover.bg) }}>
             {workshop.name}
           </h1>
         </div>

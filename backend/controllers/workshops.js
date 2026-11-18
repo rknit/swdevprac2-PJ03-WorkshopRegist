@@ -1,23 +1,25 @@
 const Workshop = require("../models/Workshop");
 const Registration = require("../models/Registration");
-const { bangkokTodayStart, parseWorkshopDate, parseStartTime } = require("../lib/dates");
+const { bangkokTodayStart, parseWorkshopDate, parseStartTime, parseCoverImage } = require("../lib/dates");
 
 // A user may hold at most this many registrations on still-active workshops.
 const MAX_ACTIVE = 3;
 
 const todayBkk = () => bangkokTodayStart();
 
-const parseWorkshopInput = ({ workshopDate, startTime, capacity }) => {
+const parseWorkshopInput = ({ workshopDate, startTime, coverImage, capacity }) => {
   const parsed = parseWorkshopDate(workshopDate);
   if (parsed.error) return parsed;
   const today = todayBkk();
   if (parsed.date < today) return { error: "Workshop date cannot be in the past" };
   const time = parseStartTime(startTime);
   if (time.error) return time;
+  const cover = parseCoverImage(coverImage);
+  if (cover.error) return cover;
   if (!Number.isInteger(capacity) || capacity < 1) {
     return { error: "Capacity must be a positive integer" };
   }
-  return { workshopDate: parsed.date, startTime: time.given ? time.startTime : null, capacity };
+  return { workshopDate: parsed.date, startTime: time.given ? time.startTime : null, coverImage: cover.given ? cover.coverImage : null, capacity };
 };
 
 const workshopFields = ({ name, description, instructor, location }) => ({ name, description, instructor, location });
@@ -80,6 +82,8 @@ exports.updateWorkshop = async (req, res, next) => {
     }
     const time = parseStartTime(req.body.startTime);
     if (time.error) return res.status(400).json({ success: false, error: time.error });
+    const cover = parseCoverImage(req.body.coverImage);
+    if (cover.error) return res.status(400).json({ success: false, error: cover.error });
     let capacityChange = null;
     if (req.body.capacity !== undefined) {
       if (!Number.isInteger(req.body.capacity) || req.body.capacity < 1) {
@@ -93,6 +97,7 @@ exports.updateWorkshop = async (req, res, next) => {
     const update = { ...fields };
     if (dateChange) update.workshopDate = dateChange;
     if (time.given) update.startTime = time.startTime;
+    if (cover.given) update.coverImage = cover.coverImage;
     if (capacityChange !== null) {
       // Atomic capacity floor: the reduction only succeeds while the workshop
       // still holds at most the new capacity.

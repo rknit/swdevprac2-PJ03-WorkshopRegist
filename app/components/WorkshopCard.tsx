@@ -1,10 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import type { Workshop } from "../../lib/api";
 import { coverFor, dayTwoDigit, monthShort, seatsTaken, whenLabel } from "../../lib/format";
-import { CapacityBar, Icon } from "./ui";
+import { CapacityBar, CoverImage, Icon } from "./ui";
 
 // Figma: WorkshopCard (cover with date stamp and decoration, body with meta, seats, and action).
 export function WorkshopCard({ workshop }: { workshop: Workshop }) {
@@ -17,7 +16,7 @@ export function WorkshopCard({ workshop }: { workshop: Workshop }) {
           <span className="t-label datestamp-month">{monthShort(workshop.workshopDate)}</span>
           <span className="datestamp-day">{dayTwoDigit(workshop.workshopDate)}</span>
         </div>
-        <Image className="wcard-deco" src={cover.deco} alt="" aria-hidden width={120} height={120} unoptimized loading="eager" />
+        <CoverImage src={workshop.coverImage} className="cover-image" />
       </div>
       <div className="wcard-body">
         <h2 id={titleId} className="t-heading-s">

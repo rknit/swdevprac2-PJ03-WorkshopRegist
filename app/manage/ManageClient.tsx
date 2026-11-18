@@ -15,11 +15,12 @@ type FormState = {
   workshopDate: string;
   location: string;
   capacity: string;
+  coverImage: string;
 };
 type FormErrors = Partial<Record<keyof FormState, string>>;
 type Filter = "all" | "upcoming" | "ended" | "full";
 
-const EMPTY: FormState = { name: "", description: "", instructor: "", workshopDate: "", location: "", capacity: "" };
+const EMPTY: FormState = { name: "", description: "", instructor: "", workshopDate: "", location: "", capacity: "", coverImage: "" };
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "upcoming", label: "Upcoming" },
@@ -27,6 +28,16 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "full", label: "Full" },
 ];
 const PAGE_SIZE = 5;
+
+// Same rule as the backend: an http(s) URL.
+const isHttpUrl = (value: string) => {
+  try {
+    const u = new URL(value);
+    return (u.protocol === "https:" || u.protocol === "http:") && !/\s/.test(value);
+  } catch {
+    return false;
+  }
+};
 
 export function ManageClient() {
   return (
@@ -298,6 +309,7 @@ const formFrom = (w: Workshop | null): FormState =>
         workshopDate: bkkDay(w.workshopDate),
         location: w.location,
         capacity: String(w.capacity),
+        coverImage: w.coverImage ?? "",
       }
     : EMPTY;
 
@@ -339,6 +351,7 @@ function WorkshopForm({
     if (!/^\d{4}-\d{2}-\d{2}$/.test(form.workshopDate)) e.workshopDate = "Pick a date.";
     // The backend rejects any change to a past date. An edit that keeps the old date is allowed.
     else if (today && form.workshopDate < today && !(editing && bkkDay(editing.workshopDate) === form.workshopDate)) e.workshopDate = "Pick today or a later date.";
+    if (form.coverImage.trim() && !isHttpUrl(form.coverImage.trim())) e.coverImage = "Enter a full image link that starts with https://";
     const cap = Number(form.capacity);
     if (!Number.isInteger(cap) || cap < 1) e.capacity = "Enter a whole number, 1 or more.";
     else if (editing && cap < (editing.registeredCount ?? 0)) e.capacity = `${editing.registeredCount} seats are taken. Use ${editing.registeredCount} or more.`;
@@ -362,6 +375,7 @@ function WorkshopForm({
       instructor: form.instructor.trim(),
       location: form.location.trim(),
       capacity: Number(form.capacity),
+      coverImage: form.coverImage.trim() || null,
     };
     // Send the date only when it changed, so an admin can still edit other fields of a past workshop.
     if (!editing || bkkDay(editing.workshopDate) !== form.workshopDate) body.workshopDate = form.workshopDate;
@@ -373,6 +387,7 @@ function WorkshopForm({
       const msg = errorText(err);
       if (/date/i.test(msg)) setErrors({ workshopDate: msg });
       else if (/capacity/i.test(msg)) setErrors({ capacity: msg });
+      else if (/coverImage/i.test(msg)) setErrors({ coverImage: "Enter a full image link that starts with https://" });
       else setGeneral(msg);
       setBusy(false);
     }
@@ -429,6 +444,7 @@ function WorkshopForm({
         {field("capacity", "Capacity", <input type="number" min={1} step={1} inputMode="numeric" {...attrs("capacity")} />)}
       </div>
       {field("location", "Location", <input {...attrs("location")} />)}
+      {field("coverImage", "Banner image URL", <input type="url" inputMode="url" placeholder="https://" {...attrs("coverImage")} />)}
       {general && (
         <p className="notice notice-error" role="alert">
           {general}

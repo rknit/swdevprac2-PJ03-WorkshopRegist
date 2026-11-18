@@ -717,12 +717,6 @@ select.field-control {
   overflow: hidden;
   border-bottom: 2px solid var(--ink);
 }
-/* Figma: deco 120px at x=280 inside a 380px inner box, so it overhangs the right edge by 20px. */
-.wcard-deco {
-  position: absolute;
-  right: -20px;
-  top: 70px;
-}
 .datestamp {
   position: relative;
   z-index: 1;
@@ -1108,11 +1102,25 @@ select.field-control {
   border-radius: 32px;
   box-shadow: var(--shadow-8);
 }
+/* Workshop banner image: fills the card cover or the detail banner. */
+.cover-image {
+  object-fit: cover;
+  z-index: 0;
+}
+/* A dark wash on the left keeps the white title readable on any photo. */
+.banner.has-image::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(90deg, rgb(23 18 43 / 0.72) 0%, rgb(23 18 43 / 0.35) 55%, rgb(23 18 43 / 0) 100%);
+  pointer-events: none;
+}
 .banner-text {
   position: absolute;
   left: 46px;
   top: 46px;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -1125,29 +1133,6 @@ select.field-control {
   overflow: hidden;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
-}
-.banner-shape {
-  position: absolute;
-}
-/* Banner shapes, measured from the right edge of the 1308px inner box in Figma. */
-.banner-ellipse-lg {
-  right: 10px;
-  top: -62px;
-}
-.banner-square {
-  position: absolute;
-  right: -51px;
-  top: 141px;
-  width: 200px;
-  height: 200px;
-  border: 2px solid var(--ink);
-  border-radius: 36px;
-  background: var(--pink);
-  transform: rotate(-14deg);
-}
-.banner-ellipse-sm {
-  right: 310px;
-  top: 198px;
 }
 .detail-columns {
   display: flex;
@@ -1414,27 +1399,11 @@ select.field-control {
     left: 0;
     top: 0;
     width: 100%;
-    padding: 32px 28px 120px;
+    padding: 32px 28px 48px;
   }
   .banner-title {
     font-size: 40px;
     line-height: 44px;
-  }
-  /* Keep the shapes in the bottom band, below the title, so the text stays readable. */
-  .banner-ellipse-lg {
-    top: auto;
-    bottom: -200px;
-    right: -40px;
-  }
-  .banner-square {
-    top: auto;
-    bottom: -120px;
-    right: -70px;
-  }
-  .banner-ellipse-sm {
-    top: auto;
-    bottom: -50px;
-    right: 210px;
   }
   /* Date block on the left runs the full card height; actions sit under the text. */
   .reg-row {

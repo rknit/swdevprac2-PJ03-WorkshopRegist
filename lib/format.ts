@@ -69,14 +69,15 @@ export function paletteIndex(id: string, size: number): number {
   return (h >>> 0) % size;
 }
 
-// Cover colour and its decoration circle, in the order the design uses them.
+// Cover colours, in the order the design uses them. A workshop without a
+// banner image shows its colour alone.
 export const COVERS = [
-  { bg: "var(--violet)", deco: "/figma/deco-1.svg" },
-  { bg: "var(--sun)", deco: "/figma/deco-2.svg" },
-  { bg: "var(--coral)", deco: "/figma/deco-3.svg" },
-  { bg: "var(--mint)", deco: "/figma/deco-4.svg" },
-  { bg: "var(--sky)", deco: "/figma/deco-1.svg" },
-  { bg: "var(--mist)", deco: "/figma/deco-3.svg" },
+  { bg: "var(--violet)" },
+  { bg: "var(--sun)" },
+  { bg: "var(--coral)" },
+  { bg: "var(--mint)" },
+  { bg: "var(--sky)" },
+  { bg: "var(--mist)" },
 ] as const;
 
 export const coverFor = (id: string) => COVERS[paletteIndex(id, COVERS.length)];

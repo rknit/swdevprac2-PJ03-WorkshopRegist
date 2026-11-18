@@ -176,6 +176,13 @@
  *             "format": "date",
  *             "description": "Real calendar date in YYYY-MM-DD format; today or later in UTC."
  *           },
+ *           "coverImage": {
+ *             "type": "string",
+ *             "nullable": true,
+ *             "format": "uri",
+ *             "example": "https://picsum.photos/id/1/1200/600",
+ *             "description": "Optional banner image URL (http or https, at most 2048 characters). Send null or an empty string to clear it."
+ *           },
  *           "startTime": {
  *             "type": "string",
  *             "nullable": true,
@@ -221,6 +228,13 @@
  *             "type": "string",
  *             "format": "date",
  *             "description": "Real calendar date in YYYY-MM-DD format; today or later in UTC."
+ *           },
+ *           "coverImage": {
+ *             "type": "string",
+ *             "nullable": true,
+ *             "format": "uri",
+ *             "example": "https://picsum.photos/id/1/1200/600",
+ *             "description": "Optional banner image URL (http or https, at most 2048 characters). Send null or an empty string to clear it."
  *           },
  *           "startTime": {
  *             "type": "string",
@@ -268,6 +282,11 @@
  *             "type": "string",
  *             "nullable": true,
  *             "example": "13:00"
+ *           },
+ *           "coverImage": {
+ *             "type": "string",
+ *             "nullable": true,
+ *             "format": "uri"
  *           },
  *           "location": {
  *             "type": "string",
