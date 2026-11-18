@@ -193,8 +193,9 @@ function RegisterPanel({
   busy: boolean;
   onRegister: () => void;
 }) {
-  // Flow 2 decision order: registration closed? -> active registrations >= 3? ->
-  // workshop full? -> "You are in!" (already registered, or after a successful register).
+  // Order: registration closed? -> already registered ("You are in!") ->
+  // active registrations >= 3? -> workshop full? A member who holds a seat here
+  // always sees "You are in!", even at 3/3 or when the workshop is full.
   if (past) {
     return (
       <StateBlock badge={<Badge status="past">Ended</Badge>} title="Registration closed">
@@ -204,7 +205,19 @@ function RegisterPanel({
       </StateBlock>
     );
   }
-  if (role === "member" && limitReached) {
+  // Until the member's own registrations load, "registered" and "limit" are not
+  // known yet; showing Full or Seat limit now would flash a wrong state.
+  const deciding = role === "loading" || (role === "member" && !mineLoaded);
+  if (!deciding && role === "member" && registered) {
+    return (
+      <StateBlock badge={<Badge status="registered">Registered</Badge>} title="You are in!">
+        <ButtonLink href="/account" variant="secondary" block>
+          Manage in My Registrations
+        </ButtonLink>
+      </StateBlock>
+    );
+  }
+  if (!deciding && role === "member" && limitReached) {
     return (
       <StateBlock badge={<Badge status="few">{`${activeCount} / ${MAX_ACTIVE} seats`}</Badge>} title="Seat limit reached">
         <ButtonLink href="/account" variant="dark" block>
@@ -213,21 +226,12 @@ function RegisterPanel({
       </StateBlock>
     );
   }
-  if (isFull(workshop)) {
+  if (!deciding && isFull(workshop)) {
     return (
       <StateBlock badge={<Badge status="full">Full</Badge>} title="This workshop is full">
         <Button variant="secondary" block disabled>
           Workshop is full
         </Button>
-      </StateBlock>
-    );
-  }
-  if (role === "member" && registered) {
-    return (
-      <StateBlock badge={<Badge status="registered">Registered</Badge>} title="You are in!">
-        <ButtonLink href="/account" variant="secondary" block>
-          Manage in My Registrations
-        </ButtonLink>
       </StateBlock>
     );
   }
@@ -242,7 +246,7 @@ function RegisterPanel({
       <CapacityBar workshop={workshop} />
       {role === "member" ? (
         <Button block onClick={onRegister} disabled={busy || !mineLoaded}>
-          {busy ? "Registering…" : "Register for this workshop"}
+          {busy ? "Registering…" : !mineLoaded ? "Loading…" : "Register for this workshop"}
         </Button>
       ) : role === "admin" ? (
         <ButtonLink href={`/manage?edit=${workshop._id}`} variant="secondary" block>
@@ -254,7 +258,7 @@ function RegisterPanel({
         </ButtonLink>
       ) : (
         <Button block disabled>
-          Register for this workshop
+          Loading…
         </Button>
       )}
     </>
