@@ -1,1 +1,1 @@
-{"$schema":"https://openapi.vercel.sh/vercel.json","functions":{"server.js":{"maxDuration":60}}}
+{"$schema":"https://openapi.vercel.sh/vercel.json","regions":["sin1"],"functions":{"server.js":{"maxDuration":60}}}
