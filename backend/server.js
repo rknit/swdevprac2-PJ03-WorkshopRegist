@@ -128,7 +128,7 @@ const hpp = require("hpp");
 const swaggerJsDoc = require("swagger-jsdoc");
 const swaggerUI = require("swagger-ui-express");
 const cors = require("cors");
-const connectDB = require("./config/db");
+const getDb = require("./config/db");
 const auth = require("./routes/auth");
 const workshops = require("./routes/workshops");
 const registrations = require("./routes/registrations");
@@ -136,19 +136,35 @@ const registrations = require("./routes/registrations");
 dotenv.config({ path: "./config/config.env" });
 
 if (process.env.MONGO_URI) {
-  connectDB().catch((error) => {
+  // Start connecting at cold start, but never kill the process on failure.
+  getDb().catch((error) => {
     console.error(`Database connection failed: ${error.message}`);
-    process.exit(1);
   });
 }
 
 const app = express();
 
+// Vercel terminates TLS and sets X-Forwarded-For; express-rate-limit needs
+// the trusted hop to key requests by real client IP.
+app.set("trust proxy", 1);
+
+// Wait for the shared connection before serving API requests,
+// so serverless cold starts do not hit mongoose's buffering timeout.
+app.use(async (req, res, next) => {
+  if (!process.env.MONGO_URI) return next();
+  try {
+    await getDb();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.use(helmet());
 app.use(hpp());
 app.use(rateLimit({
   windowMs: 10 * 60 * 1000,
-  limit: 100,
+  limit: Number(process.env.RATE_LIMIT || 100),
   message: {
     success: false,
     error: "Too many requests from this IP, please try again later.",
@@ -228,19 +244,24 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
-  console.log(`Workshop Registration API running on http://localhost:${PORT}`);
-});
+// Vercel's Express adapter needs the Express app as the default export.
+// A port listener is only needed for local development.
+module.exports = app;
+module.exports.default = app;
 
-process.on("unhandledRejection", (error) => {
-  console.error(`Unhandled rejection: ${error.message}`);
-  server.close(() => process.exit(1));
-});
+if (process.env.VERCEL === undefined) {
+  const PORT = process.env.PORT || 5000;
+  const server = app.listen(PORT, () => {
+    console.log(`Workshop Registration API running on http://localhost:${PORT}`);
+  });
 
-process.on("uncaughtException", (error) => {
-  console.error(`Uncaught exception: ${error.message}`);
-  process.exit(1);
-});
+  process.on("unhandledRejection", (error) => {
+    console.error(`Unhandled rejection: ${error.message}`);
+    server.close(() => process.exit(1));
+  });
 
-module.exports = { app, server };
+  process.on("uncaughtException", (error) => {
+    console.error(`Uncaught exception: ${error.message}`);
+    process.exit(1);
+  });
+}

@@ -6,7 +6,7 @@ import { api, fmtDate, type Workshop } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 
 export function WorkshopDetail({ id }: { id: string }) {
-  const { user } = useAuth();
+  const user = useAuth().user;
   const [workshop, setWorkshop] = useState<Workshop | null>(null);
   const [registrations, setRegistrations] = useState<number | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -14,17 +14,27 @@ export function WorkshopDetail({ id }: { id: string }) {
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
       try {
         const res = await api.getWorkshop(id);
+        if (cancelled) return;
         setWorkshop(res.data);
-        const regs = await api.listRegistrations();
-        setRegistrations(regs.data.filter((r) => r.workshop?._id === id).length);
       } catch {
-        setNotFound(true);
+        if (!cancelled) setNotFound(true);
+      }
+      // Only an authenticated user can read the registration count.
+      if (user) {
+        try {
+          const regs = await api.listRegistrations();
+          if (!cancelled) setRegistrations(regs.data.filter((r) => r.workshop?._id === id).length);
+        } catch {
+          if (!cancelled) setRegistrations(0);
+        }
       }
     })();
-  }, [id]);
+    return () => { cancelled = true; };
+  }, [id, user]);
 
   const refreshCount = async (workshopId: string) => {
     const regs = await api.listRegistrations();

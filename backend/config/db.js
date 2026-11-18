@@ -1,14 +1,26 @@
 const mongoose = require("mongoose");
-const dns = require("node:dns");
 
-// Use public DNS resolvers for MongoDB Atlas SRV lookups.
-dns.setServers(["1.1.1.1", "8.8.8.8"]);
+let connectPromise = null;
 
-const connectDB = async () => {
-  mongoose.set("strictQuery", true);
-  const conn = await mongoose.connect(process.env.MONGO_URI);
+function getDb() {
+  if (!connectPromise) {
+    mongoose.set("strictQuery", true);
+    connectPromise = mongoose.connect(process.env.MONGO_URI, {
+      // Fail fast with a real error instead of hanging on cold start,
+      // so serverless surfaces the true network cause.
+      serverSelectionTimeoutMS: Number(process.env.MONGO_SS_TIMEOUT_MS || 8000),
+      connectTimeoutMS: Number(process.env.MONGO_CONNECT_TIMEOUT_MS || 8000),
+    }).then((conn) => {
+      console.log(`MongoDB Connected: ${conn.connection.host}`);
+      return conn;
+    });
+    // A rejected promise is not sticky: allow a later attempt in a fresh process.
+    connectPromise.catch((error) => {
+      console.error(`MongoDB connection failed: ${error.name}: ${error.message}`);
+      connectPromise = null;
+    });
+  }
+  return connectPromise;
+}
 
-  console.log(`MongoDB Connected: ${conn.connection.host}`);
-};
-
-module.exports = connectDB;
+module.exports = getDb;
