@@ -31,6 +31,11 @@ export function LoginClient() {
     try {
       const signedIn = await login(email.trim(), password);
       // Flow 1: "User is admin?" yes -> Manage workshops (Flow 4), no -> Browse workshops (Flow 2).
+      // Next.js keeps this page mounted (hidden) after we leave it, so reset the
+      // form now; otherwise the next visit (after log out) is stuck on "Logging in…".
+      setEmail(null);
+      setPassword("");
+      setBusy(false);
       router.push(signedIn.role === "admin" ? "/manage" : "/");
     } catch (err) {
       const msg = errorText(err);

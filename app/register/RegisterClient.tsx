@@ -70,7 +70,13 @@ export function RegisterClient() {
       // No role field: the backend always creates a `member`.
       // Flow 1: "Valid info?" yes -> 04 Log in. The account is created, but the user logs in themselves.
       await api.register({ name: values.name.trim(), email: values.email.trim(), tel: values.tel.trim(), password: values.password });
-      router.push(`/login?email=${encodeURIComponent(values.email.trim())}`);
+      const email = values.email.trim();
+      // Next.js keeps this page mounted (hidden) after we leave it, so reset the
+      // form now; otherwise a return visit shows it stuck on "Creating account…".
+      setValues({ name: "", email: "", tel: "", password: "" });
+      setErrors({});
+      setBusy(false);
+      router.push(`/login?email=${encodeURIComponent(email)}`);
     } catch (err) {
       const parsed = serverErrors(errorText(err));
       setErrors(parsed.fields);
