@@ -18,15 +18,20 @@ export function AccountClient() {
       const [regs, ws] = await Promise.all([api.listRegistrations(), api.listWorkshops()]);
       setRegistrations(regs.data);
       setWorkshops(ws.data);
+      if (user?.role === "admin") {
+        const us = await api.listUsers();
+        setUsers(us.data);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoaded(true);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (user) void load();
+    else setLoaded(true);
   }, [user, load]);
 
   const changeWorkshop = async (id: string, newWorkshopId: string) => {
@@ -55,6 +60,30 @@ export function AccountClient() {
       setResult({ ok: false, text: e instanceof Error ? e.message : String(e), id: null });
     } finally {
       setBusyId(null);
+    }
+  };
+
+  // Admins can create a registration for a named user.
+  const [users, setUsers] = useState<{ _id: string; name: string; email: string }[]>([]);
+  const [newUser, setNewUser] = useState("");
+  const [newWorkshop, setNewWorkshop] = useState("");
+  const [createBusy, setCreateBusy] = useState(false);
+  const [createResult, setCreateResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const submitCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUser || !newWorkshop) return;
+    setCreateBusy(true);
+    setCreateResult(null);
+    try {
+      const res = await api.createRegistration(newWorkshop, newUser);
+      setCreateResult({ ok: true, text: `Registration created for ${newUser}. id: ${res.data._id}` });
+      setNewWorkshop("");
+      await load();
+    } catch (err) {
+      setCreateResult({ ok: false, text: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setCreateBusy(false);
     }
   };
 
@@ -99,7 +128,13 @@ export function AccountClient() {
                 <td><code>{r._id}</code></td>
                 {isAdmin && (
                   <td>
-                    {r.user ? `${r.user.name} (${r.user.email})` : "—"}
+                    {r.user ? (
+                      <>
+                        {r.user.name} ({r.user.email}) <code>{r.user._id}</code>
+                      </>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                 )}
                 <td>
@@ -142,6 +177,38 @@ export function AccountClient() {
             ))}
           </tbody>
         </table>
+      )}
+      {isAdmin && (
+        <div className="card">
+          <h2>Create a registration for a user</h2>
+          <p>Pick the user by ID (listed in the table above) and the workshop.</p>
+          {createResult && <p className={createResult.ok ? "ok" : "error"}>{createResult.text}</p>}
+          <form onSubmit={(e) => void submitCreate(e)} className="row">
+            <label className="field">
+              User ID
+              <select value={newUser} onChange={(e) => setNewUser(e.target.value)} required>
+                <option value="">—</option>
+                {users.map((u) => (
+                  <option key={u._id} value={u._id}>
+                    {u.name} ({u.email})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              Workshop
+              <select value={newWorkshop} onChange={(e) => setNewWorkshop(e.target.value)} required>
+                <option value="">—</option>
+                {workshops.map((w) => (
+                  <option key={w._id} value={w._id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit" disabled={createBusy}>{createBusy ? "Creating…" : "Create"}</button>
+          </form>
+        </div>
       )}
     </div>
   );

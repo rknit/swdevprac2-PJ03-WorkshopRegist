@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api, fmtDate, type Workshop } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 
@@ -41,6 +41,7 @@ export function ManageClient() {
 
   useEffect(() => {
     if (isAdmin) void load();
+    else setLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
@@ -94,6 +95,40 @@ export function ManageClient() {
       await load();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const [users, setUsers] = useState<{ _id: string; name: string; email: string; tel: string; role: "member" | "admin" }[]>([]);
+  const [usersLoaded, setUsersLoaded] = useState(false);
+  const [roleMsg, setRoleMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [roleBusyId, setRoleBusyId] = useState<string | null>(null);
+
+  const loadUsers = useCallback(async () => {
+    try {
+      const res = await api.listUsers();
+      setUsers(res.data);
+    } catch (e) {
+      setRoleMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setUsersLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAdmin) void loadUsers();
+  }, [isAdmin, loadUsers]);
+
+  const setRole = async (userId: string, role: "member" | "admin") => {
+    setRoleBusyId(userId);
+    setRoleMsg(null);
+    try {
+      await api.setRole(userId, role);
+      setRoleMsg({ ok: true, text: `User ${userId} set to ${role}.` });
+      await loadUsers();
+    } catch (e) {
+      setRoleMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setRoleBusyId(null);
     }
   };
 
@@ -178,6 +213,48 @@ export function ManageClient() {
             )}
           </div>
         </form>
+      </div>
+      <div className="card">
+        <h2>Users &amp; roles</h2>
+        <p>The <code>admin</code> role is only ever assigned here. New registrations are always <code>member</code>.</p>
+        {roleMsg && <p className={roleMsg.ok ? "ok" : "error"}>{roleMsg.text}</p>}
+        {!usersLoaded && <p>Loading users…</p>}
+        {usersLoaded && (
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Tel</th>
+                <th>Role</th>
+                <th>id</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u._id}>
+                  <td>{u.name}</td>
+                  <td>{u.email}</td>
+                  <td>{u.tel}</td>
+                  <td>{u.role}</td>
+                  <td><code>{u._id}</code></td>
+                  <td>
+                    {u.role === "admin" ? (
+                      <button disabled={roleBusyId === u._id} onClick={() => void setRole(u._id, "member")}>
+                        Demote to member
+                      </button>
+                    ) : (
+                      <button disabled={roleBusyId === u._id} onClick={() => void setRole(u._id, "admin")}>
+                        Promote to admin
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

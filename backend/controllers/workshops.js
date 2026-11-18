@@ -1,21 +1,21 @@
 const Workshop = require("../models/Workshop");
 const Registration = require("../models/Registration");
+const { bangkokTodayStart, parseWorkshopDate } = require("../lib/dates");
+
+// A user may hold at most this many registrations on still-active workshops.
+const MAX_ACTIVE = 3;
+
+const todayBkk = () => bangkokTodayStart();
 
 const parseWorkshopInput = ({ workshopDate, capacity }) => {
-  if (typeof workshopDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(workshopDate)) {
-    return { error: "A valid workshopDate in YYYY-MM-DD format is required" };
-  }
-  const date = new Date(`${workshopDate}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== workshopDate) {
-    return { error: "Invalid workshop date" };
-  }
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  if (date < today) return { error: "Workshop date cannot be in the past" };
+  const parsed = parseWorkshopDate(workshopDate);
+  if (parsed.error) return parsed;
+  const today = todayBkk();
+  if (parsed.date < today) return { error: "Workshop date cannot be in the past" };
   if (!Number.isInteger(capacity) || capacity < 1) {
     return { error: "Capacity must be a positive integer" };
   }
-  return { workshopDate: date, capacity };
+  return { workshopDate: parsed.date, capacity };
 };
 
 const workshopFields = ({ name, description, instructor, location }) => ({ name, description, instructor, location });
@@ -64,35 +64,58 @@ exports.updateWorkshop = async (req, res, next) => {
   try {
     const workshop = await Workshop.findOne({ _id: req.params.id, isActive: true });
     if (!workshop) return res.status(404).json({ success: false, error: "Workshop not found" });
-    const parsed = parseWorkshopInput({
-      workshopDate: req.body.workshopDate === undefined ? workshop.workshopDate.toISOString().slice(0, 10) : req.body.workshopDate,
-      capacity: req.body.capacity === undefined ? workshop.capacity : req.body.capacity,
-    });
-    if (parsed.error) return res.status(400).json({ success: false, error: parsed.error });
-    const count = await Registration.countDocuments({ workshop: workshop.id });
-    if (parsed.capacity < count) {
-      return res.status(409).json({ success: false, error: "Capacity cannot be less than existing registrations" });
-    }
 
-    // Rescheduling a past workshop can reactivate its existing registrations.
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const activeWorkshops = await Workshop.find({ isActive: true, workshopDate: { $gte: today }, _id: { $ne: workshop.id } });
-    const activeIds = activeWorkshops.map((item) => item.id);
-    const members = await Registration.distinct("user", { workshop: workshop.id });
-    for (const user of members) {
-      const activeCount = await Registration.countDocuments({ user, workshop: { $in: activeIds } });
-      if (activeCount >= 3) {
-        return res.status(409).json({ success: false, error: "Workshop change would exceed a member's active registration limit" });
+    // Only validate a workshopDate the request actually provides: an admin
+    // must be able to edit any other field of a past workshop (FIX-8).
+    let dateChange = null;
+    if (req.body.workshopDate !== undefined) {
+      const parsed = parseWorkshopDate(req.body.workshopDate);
+      if (parsed.error) return res.status(400).json({ success: false, error: parsed.error });
+      if (parsed.date < todayBkk()) {
+        return res.status(400).json({ success: false, error: "Workshop date cannot be in the past" });
       }
+      dateChange = parsed.date;
+    }
+    let capacityChange = null;
+    if (req.body.capacity !== undefined) {
+      if (!Number.isInteger(req.body.capacity) || req.body.capacity < 1) {
+        return res.status(400).json({ success: false, error: "Capacity must be a positive integer" });
+      }
+      capacityChange = req.body.capacity;
     }
 
     const fields = workshopFields(req.body);
     Object.keys(fields).forEach((key) => { if (fields[key] === undefined) delete fields[key]; });
+    const update = { ...fields };
+    if (dateChange) update.workshopDate = dateChange;
+    if (capacityChange !== null) {
+      // Atomic capacity floor: the reduction only succeeds while the workshop
+      // still holds at most the new capacity.
+      const result = await Workshop.updateOne(
+        { _id: workshop.id, isActive: true, registeredCount: { $lte: capacityChange } },
+        { capacity: capacityChange },
+      );
+      if (result.matchedCount === 0) {
+        return res.status(409).json({ success: false, error: "Capacity cannot be less than existing registrations" });
+      }
+    }
+
+    // If the change moves the workshop from past to future, its existing
+    // registrations reactivate and count toward each member's 3-active limit.
+    if (dateChange && workshop.workshopDate < todayBkk() && dateChange >= todayBkk()) {
+      const members = await Registration.distinct("user", { workshop: workshop.id });
+      for (const user of members) {
+        const live = await liveActiveCountExcluding(user, workshop.id);
+        if (live >= MAX_ACTIVE) {
+          return res.status(409).json({ success: false, error: "Workshop change would exceed a member's active registration limit" });
+        }
+      }
+    }
+
     const updated = await Workshop.findOneAndUpdate(
       { _id: workshop.id, isActive: true },
-      { ...fields, ...parsed },
-      { new: true, runValidators: true }
+      update,
+      { new: true, runValidators: true },
     );
     if (!updated) return res.status(404).json({ success: false, error: "Workshop not found" });
     res.status(200).json({ success: true, data: updated });
@@ -101,12 +124,25 @@ exports.updateWorkshop = async (req, res, next) => {
   }
 };
 
+// Live active registrations for a user, not counting the given workshop.
+const liveActiveCountExcluding = async (userId, excludeWorkshopId) => {
+  const today = todayBkk();
+  const active = await Workshop.find({
+    isActive: true,
+    workshopDate: { $gte: today },
+    _id: { $ne: excludeWorkshopId },
+  }).lean();
+  if (active.length === 0) return 0;
+  const activeIds = active.map((item) => item._id);
+  return Registration.countDocuments({ user: userId, workshop: { $in: activeIds } });
+};
+
 exports.deleteWorkshop = async (req, res, next) => {
   try {
     const workshop = await Workshop.findOneAndUpdate(
       { _id: req.params.id, isActive: true },
       { isActive: false },
-      { new: true }
+      { new: true },
     );
     if (!workshop) return res.status(404).json({ success: false, error: "Workshop not found" });
     res.status(200).json({ success: true, data: {} });

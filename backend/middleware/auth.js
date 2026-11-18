@@ -1,5 +1,7 @@
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const RevokedToken = require("../models/RevokedToken");
 
 exports.protect = async (req, res, next) => {
   let token;
@@ -9,6 +11,18 @@ exports.protect = async (req, res, next) => {
 
   if (!token) {
     return res.status(401).json({ success: false, error: "Not authorized to access this route" });
+  }
+
+  // A logged-out token must not work again.
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  try {
+    const revoked = await RevokedToken.findOne({ tokenHash });
+    if (revoked) {
+      return res.status(401).json({ success: false, error: "Token has been revoked" });
+    }
+  } catch (error) {
+    // A revocation-store outage must not lock everyone out of the API.
+    console.error(`Revocation lookup failed: ${error.message}`);
   }
 
   try {

@@ -8,10 +8,20 @@ import { useAuth } from "../../../lib/auth";
 export function WorkshopDetail({ id }: { id: string }) {
   const user = useAuth().user;
   const [workshop, setWorkshop] = useState<Workshop | null>(null);
-  const [registrations, setRegistrations] = useState<number | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // The registered total comes from the workshop itself (registeredCount),
+  // which is accurate for everyone: members, admins, anonymous visitors.
+  const loadWorkshop = async (workshopId: string) => {
+    try {
+      const res = await api.getWorkshop(workshopId);
+      setWorkshop(res.data);
+    } catch {
+      setNotFound(true);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -23,23 +33,9 @@ export function WorkshopDetail({ id }: { id: string }) {
       } catch {
         if (!cancelled) setNotFound(true);
       }
-      // Only an authenticated user can read the registration count.
-      if (user) {
-        try {
-          const regs = await api.listRegistrations();
-          if (!cancelled) setRegistrations(regs.data.filter((r) => r.workshop?._id === id).length);
-        } catch {
-          if (!cancelled) setRegistrations(0);
-        }
-      }
     })();
     return () => { cancelled = true; };
-  }, [id, user]);
-
-  const refreshCount = async (workshopId: string) => {
-    const regs = await api.listRegistrations();
-    setRegistrations(regs.data.filter((r) => r.workshop?._id === workshopId).length);
-  };
+  }, [id]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +45,7 @@ export function WorkshopDetail({ id }: { id: string }) {
     try {
       const res = await api.createRegistration(workshop._id);
       setResult({ ok: true, text: `Registered. Registration id: ${res.data._id}` });
-      await refreshCount(workshop._id);
+      await loadWorkshop(workshop._id);
     } catch (err) {
       setResult({ ok: false, text: err instanceof Error ? err.message : String(err) });
     } finally {
@@ -73,10 +69,8 @@ export function WorkshopDetail({ id }: { id: string }) {
             <p><strong>Date:</strong> {fmtDate(workshop.workshopDate)}</p>
             <p><strong>Location:</strong> {workshop.location}</p>
             <p><strong>Capacity:</strong> {workshop.capacity}</p>
+            <p><strong>Registered so far:</strong> {workshop.registeredCount ?? 0} / {workshop.capacity}</p>
             <p><strong>Workshop id:</strong> <code>{workshop._id}</code></p>
-            {registrations !== null && (
-              <p><strong>Registered so far:</strong> {registrations} / {workshop.capacity}</p>
-            )}
           </div>
           {user?.role === "member" ? (
             <form onSubmit={(e) => void submit(e)} className="card">

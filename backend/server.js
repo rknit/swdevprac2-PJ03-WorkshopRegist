@@ -132,6 +132,7 @@ const getDb = require("./config/db");
 const auth = require("./routes/auth");
 const workshops = require("./routes/workshops");
 const registrations = require("./routes/registrations");
+const users = require("./routes/users");
 
 dotenv.config({ path: "./config/config.env" });
 
@@ -183,6 +184,7 @@ app.use(cors({
 app.use("/api/v1/auth", auth);
 app.use("/api/v1/workshops", workshops);
 app.use("/api/v1/registrations", registrations);
+app.use("/api/v1/users", users);
 
 const swaggerDocs = swaggerJsDoc({
   definition: {
@@ -235,11 +237,24 @@ app.use((req, res) => {
   });
 });
 
+// Map Mongoose error types to the client-facing status they deserve:
+// validation failures are client errors (400), not server errors (500).
+const errorStatusFor = (error) => {
+  if (error.name === "ValidationError") return 400;
+  if (error.name === "CastError") return 400;
+  if (error.code === 11000) return 409;
+  if (error.message && /^Please (add|provide)/.test(error.message)) return 400;
+  return error.statusCode || 500;
+};
+
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.statusCode || 500).json({
+  if (res.headersSent) return next(err);
+  const status = errorStatusFor(err);
+  const isClientError = status < 500;
+  console.error(isClientError ? err.message : err.stack);
+  res.status(status).json({
     success: false,
-    error: err.message || "Internal Server Error",
+    error: isClientError ? err.message : "Internal Server Error",
     ...(process.env.NODE_ENV === "development" ? { stack: err.stack } : {}),
   });
 });

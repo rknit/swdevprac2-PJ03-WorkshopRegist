@@ -316,7 +316,7 @@ const { serialize } = require("../middleware/serialize");
 const router = express.Router();
 router.use(protect);
 router.get("/", getRegistrations);
-router.post("/", authorize("member"), serialize(createRegistration));
+router.post("/", authorize("member", "admin"), serialize(createRegistration));
 router.route("/:id").get(getRegistration).put(serialize(updateRegistration)).delete(serialize(deleteRegistration));
 
 module.exports = router;

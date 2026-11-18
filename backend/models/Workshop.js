@@ -13,6 +13,10 @@ const WorkshopSchema = new mongoose.Schema(
       min: [1, "Capacity must be at least 1"],
       validate: { validator: Number.isInteger, message: "Capacity must be an integer" },
     },
+    // Number of live registrations, maintained atomically. It is the
+    // race-safe gate for capacity (atomic conditional increment) and the
+    // source of the "registered so far" total shown to everyone.
+    registeredCount: { type: Number, default: 0, min: 0 },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

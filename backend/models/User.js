@@ -13,6 +13,10 @@ const UserSchema = new mongoose.Schema({
   },
   tel: { type: String, required: [true, "Please add a telephone number"] },
   role: { type: String, enum: ["member", "admin"], default: "member" },
+  // Number of the user's registrations on currently-active workshops.
+  // Maintained by exact +1/-1 pairing in the registration controllers and
+  // seeded by scripts/seed-counters.js; gates the 3-active limit.
+  activeCount: { type: Number, default: 0, min: 0 },
   password: { type: String, required: [true, "Please add a password"], minLength: 6, select: false },
   createdAt: { type: Date, default: Date.now },
 });

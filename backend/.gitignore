@@ -3,6 +3,7 @@ npm-debug.log*
 .idea/*
 .DS_Store
 config/config.init.env
+config/config.env
 postman/
 .vercel
 .env*

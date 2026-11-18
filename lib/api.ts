@@ -18,6 +18,7 @@ export type Workshop = {
   workshopDate: string;
   location: string;
   capacity: number;
+  registeredCount?: number;
   isActive: boolean;
 };
 
@@ -86,8 +87,15 @@ export const api = {
     request<unknown>(`/api/v1/workshops/${id}`, { method: "DELETE" }),
   listRegistrations: () =>
     request<{ success: true; count: number; data: Registration[] }>("/api/v1/registrations"),
-  createRegistration: (workshopId: string) =>
-    request<{ success: true; data: Registration }>("/api/v1/registrations", { method: "POST", body: JSON.stringify({ workshop: workshopId }) }),
+  createRegistration: (workshopId: string, userId?: string) =>
+    request<{ success: true; data: Registration }>("/api/v1/registrations", {
+      method: "POST",
+      body: JSON.stringify(userId ? { workshop: workshopId, user: userId } : { workshop: workshopId }),
+    }),
+  listUsers: () =>
+    request<{ success: true; count: number; data: { _id: string; name: string; email: string; tel: string; role: "member" | "admin" }[] }>("/api/v1/users"),
+  setRole: (userId: string, role: "member" | "admin") =>
+    request<{ success: true; data: User }>(`/api/v1/users/${userId}/role`, { method: "PUT", body: JSON.stringify({ role }) }),
   updateRegistration: (id: string, workshopId: string) =>
     request<{ success: true; data: Registration }>(`/api/v1/registrations/${id}`, { method: "PUT", body: JSON.stringify({ workshop: workshopId }) }),
   deleteRegistration: (id: string) =>
