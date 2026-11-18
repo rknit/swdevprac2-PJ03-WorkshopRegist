@@ -12,19 +12,11 @@ export function useToday(): string {
   return useSyncExternalStore(noSubscribe, bkkToday, () => "");
 }
 
-// Only same-site paths are allowed as a post-login target.
-export function safeNext(): string | null {
-  if (typeof window === "undefined") return null;
-  const next = new URLSearchParams(window.location.search).get("next");
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : null;
-}
-
-function nextQuery(): string {
-  const next = safeNext();
-  return next ? `?next=${encodeURIComponent(next)}` : "";
-}
-
-// The "?next=..." part to carry between log in and sign up, or "".
-export function useNextQuery(): string {
-  return useSyncExternalStore(noSubscribe, nextQuery, () => "");
+// One query-string value on the client, "" during server render.
+export function useQueryParam(name: string): string {
+  return useSyncExternalStore(
+    noSubscribe,
+    () => (typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get(name) ?? ""),
+    () => "",
+  );
 }

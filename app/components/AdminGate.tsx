@@ -6,7 +6,7 @@ import { ButtonLink, StatePanel } from "./ui";
 
 // Shows the page only to admins. The backend also checks the role on every
 // admin route; this only keeps members and guests from an empty screen.
-export function AdminGate({ title, next, children }: { title: string; next: string; children: ReactNode }) {
+export function AdminGate({ title, children }: { title: string; children: ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) {
     return (
@@ -27,7 +27,7 @@ export function AdminGate({ title, next, children }: { title: string; next: stri
               Browse workshops
             </ButtonLink>
           ) : (
-            <ButtonLink href={`/login?next=${encodeURIComponent(next)}`}>Log in</ButtonLink>
+            <ButtonLink href="/login">Log in</ButtonLink>
           )}
         </StatePanel>
       </div>

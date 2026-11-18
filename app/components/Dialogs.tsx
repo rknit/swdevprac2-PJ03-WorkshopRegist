@@ -101,42 +101,42 @@ export function moveTargets(workshops: Workshop[], today: string, heldWorkshopId
     .sort((a, b) => Date.parse(a.workshopDate) - Date.parse(b.workshopDate));
 }
 
-// "Edit" a registration = move it to another workshop (PUT /registrations/:id).
-// No Figma frame exists for this dialog, so it reuses the dialog and input styles.
-export function ChangeWorkshopDialog({
+// Flow 3 (13.1.2) and Flow 5 (22.1): "Edit registration". The editable field is
+// the workshop: the seat moves to another workshop (PUT /registrations/:id).
+export function EditRegistrationDialog({
   open,
   currentName,
-  who,
+  member,
   targets,
   onClose,
   onSave,
 }: {
   open: boolean;
   currentName: string;
-  // Set for an admin moving another user's seat.
-  who?: string;
+  // Set for an admin editing another member's registration (Flow 5).
+  member?: string;
   targets: Workshop[];
   onClose: () => void;
   onSave: (workshopId: string) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   return (
-    <Dialog open={open} onClose={busy ? () => undefined : onClose} title="Change workshop" bar="violet">
-      <ChangeWorkshopBody currentName={currentName} who={who} targets={targets} onClose={onClose} onSave={onSave} onBusy={setBusy} />
+    <Dialog open={open} onClose={busy ? () => undefined : onClose} title="Edit registration" bar="violet">
+      <EditRegistrationBody currentName={currentName} member={member} targets={targets} onClose={onClose} onSave={onSave} onBusy={setBusy} />
     </Dialog>
   );
 }
 
-function ChangeWorkshopBody({
+function EditRegistrationBody({
   currentName,
-  who,
+  member,
   targets,
   onClose,
   onSave,
   onBusy,
 }: {
   currentName: string;
-  who?: string;
+  member?: string;
   targets: Workshop[];
   onClose: () => void;
   onSave: (workshopId: string) => Promise<void>;
@@ -153,7 +153,7 @@ function ChangeWorkshopBody({
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!choice) {
-      setError("Pick a workshop to move to.");
+      setError("Pick the new workshop.");
       return;
     }
     setBusy(true);
@@ -167,12 +167,22 @@ function ChangeWorkshopBody({
     }
   };
 
-  const strong = { color: "var(--ink)" };
   return (
-    <form onSubmit={(e) => void save(e)} noValidate style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <p className="t-body muted">
-        Move {who ? <strong style={strong}>{who}</strong> : "your seat"} from <strong style={strong}>{currentName}</strong> to another workshop. The old seat is given back.
-      </p>
+    <form onSubmit={(e) => void save(e)} noValidate style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {member !== undefined && (
+        <div className="field">
+          <label className="field-label" htmlFor="edit-reg-member">
+            Member
+          </label>
+          <input id="edit-reg-member" className="field-control" value={member} readOnly />
+        </div>
+      )}
+      <div className="field">
+        <label className="field-label" htmlFor="edit-reg-current">
+          Current workshop
+        </label>
+        <input id="edit-reg-current" className="field-control" value={currentName} readOnly />
+      </div>
       <div className="field">
         <label className="field-label" htmlFor="move-target">
           New workshop
@@ -207,10 +217,10 @@ function ChangeWorkshopBody({
       </div>
       <div className="dialog-actions">
         <Button variant="secondary" onClick={onClose} disabled={busy}>
-          Keep current
+          Cancel
         </Button>
         <Button type="submit" disabled={busy || targets.length === 0}>
-          {busy ? "Moving…" : who ? "Move seat" : "Move my seat"}
+          {busy ? "Saving…" : "Save changes"}
         </Button>
       </div>
     </form>

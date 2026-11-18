@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { errorText } from "../../lib/format";
-import { safeNext, useNextQuery } from "../../lib/hooks";
 import { AuthShell, TextField } from "../components/AuthShell";
 
 type Field = "name" | "email" | "tel" | "password";
@@ -42,8 +42,7 @@ export function RegisterClient() {
   const [errors, setErrors] = useState<Errors>({});
   const [general, setGeneral] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const carry = useNextQuery();
-  const { user, loading, register } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -69,8 +68,9 @@ export function RegisterClient() {
     setBusy(true);
     try {
       // No role field: the backend always creates a `member`.
-      const created = await register({ name: values.name.trim(), email: values.email.trim(), tel: values.tel.trim(), password: values.password });
-      router.push(safeNext() ?? (created.role === "admin" ? "/manage" : "/"));
+      // Flow 1: "Valid info?" yes -> 04 Log in. The account is created, but the user logs in themselves.
+      await api.register({ name: values.name.trim(), email: values.email.trim(), tel: values.tel.trim(), password: values.password });
+      router.push(`/login?email=${encodeURIComponent(values.email.trim())}`);
     } catch (err) {
       const parsed = serverErrors(errorText(err));
       setErrors(parsed.fields);
@@ -118,7 +118,7 @@ export function RegisterClient() {
         </button>
         <p className="auth-switch">
           <span className="muted">Have an account?</span>
-          <Link href={`/login${carry}`} className="link-violet">
+          <Link href="/login" className="link-violet">
             Log in
           </Link>
         </p>

@@ -193,21 +193,23 @@ function RegisterPanel({
   busy: boolean;
   onRegister: () => void;
 }) {
-  if (role === "member" && registered) {
-    return (
-      <StateBlock badge={<Badge status="registered">Registered</Badge>} title="You are in!">
-        <ButtonLink href="/account" variant="secondary" block>
-          Manage in My Registrations
-        </ButtonLink>
-      </StateBlock>
-    );
-  }
+  // Flow 2 decision order: registration closed? -> active registrations >= 3? ->
+  // workshop full? -> "You are in!" (already registered, or after a successful register).
   if (past) {
     return (
       <StateBlock badge={<Badge status="past">Ended</Badge>} title="Registration closed">
         <Button variant="secondary" block disabled>
           Closed
         </Button>
+      </StateBlock>
+    );
+  }
+  if (role === "member" && limitReached) {
+    return (
+      <StateBlock badge={<Badge status="few">{`${activeCount} / ${MAX_ACTIVE} seats`}</Badge>} title="Seat limit reached">
+        <ButtonLink href="/account" variant="dark" block>
+          Go to My registrations
+        </ButtonLink>
       </StateBlock>
     );
   }
@@ -220,11 +222,11 @@ function RegisterPanel({
       </StateBlock>
     );
   }
-  if (role === "member" && limitReached) {
+  if (role === "member" && registered) {
     return (
-      <StateBlock badge={<Badge status="few">{`${activeCount} / ${MAX_ACTIVE} seats`}</Badge>} title="Seat limit reached">
-        <ButtonLink href="/account" variant="dark" block>
-          Go to My registrations
+      <StateBlock badge={<Badge status="registered">Registered</Badge>} title="You are in!">
+        <ButtonLink href="/account" variant="secondary" block>
+          Manage in My Registrations
         </ButtonLink>
       </StateBlock>
     );
@@ -247,7 +249,7 @@ function RegisterPanel({
           Edit workshop
         </ButtonLink>
       ) : role === "guest" ? (
-        <ButtonLink href={`/login?next=${encodeURIComponent(`/workshop/${workshop._id}`)}`} variant="mint" block>
+        <ButtonLink href="/login" variant="mint" block>
           Sign In to Register
         </ButtonLink>
       ) : (

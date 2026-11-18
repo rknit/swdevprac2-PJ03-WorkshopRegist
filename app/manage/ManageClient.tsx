@@ -41,7 +41,7 @@ const isHttpUrl = (value: string) => {
 
 export function ManageClient() {
   return (
-    <AdminGate title="Manage workshops" next="/manage">
+    <AdminGate title="Manage workshops">
       <ManageWorkshops />
     </AdminGate>
   );
@@ -431,7 +431,7 @@ function WorkshopForm({
           // The design shows "12 Nov 2026". A native date input shows the browser's
           // format, so the box shows our text and an invisible date input sits on top.
           <div className="field-control date-control" aria-invalid={errors.workshopDate ? true : undefined}>
-            <span className={form.workshopDate ? undefined : "muted"}>{form.workshopDate ? dateShort(`${form.workshopDate}T00:00:00Z`) : "Pick a date"}</span>
+            <span className={form.workshopDate ? undefined : "muted"}>{form.workshopDate ? dateShort(`${form.workshopDate}T00:00:00Z`) : "Choose date"}</span>
             <input
               type="date"
               min={today || undefined}
@@ -461,7 +461,7 @@ function WorkshopForm({
           Cancel
         </Button>
         <Button type="submit" disabled={busy}>
-          {busy ? "Saving…" : editing ? "Save changes" : "Create workshop"}
+          {busy ? "Saving…" : editing ? "Save changes" : "Create"}
         </Button>
       </div>
     </form>

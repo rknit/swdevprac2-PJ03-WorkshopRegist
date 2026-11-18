@@ -52,6 +52,11 @@ const reserveCapacity = (workshop) =>
     { $inc: { registeredCount: 1 } },
   ).then((r) => r.matchedCount === 1);
 
+// Admin override ("Ignore Capacity"): take a seat even when the workshop is
+// full. Still one atomic increment, so the count stays exact.
+const forceCapacity = (workshop) =>
+  Workshop.updateOne({ _id: workshop.id, isActive: true }, { $inc: { registeredCount: 1 } }).then((r) => r.matchedCount === 1);
+
 const releaseCapacity = (workshopId) =>
   Workshop.updateOne({ _id: workshopId, registeredCount: { $gt: 0 } }, { $inc: { registeredCount: -1 } });
 
@@ -114,6 +119,13 @@ exports.getRegistration = async (req, res, next) => {
 exports.createRegistration = async (req, res, next) => {
   let reserved = { user: false, workshop: null };
   try {
+    if (req.body.ignoreCapacity !== undefined && typeof req.body.ignoreCapacity !== "boolean") {
+      return res.status(400).json({ success: false, error: "ignoreCapacity must be true or false" });
+    }
+    const ignoreCapacity = req.body.ignoreCapacity === true;
+    if (ignoreCapacity && req.user.role !== "admin") {
+      return res.status(403).json({ success: false, error: "Only an admin can ignore capacity" });
+    }
     const { userId, error: userError, status: userStatus } = await resolveTargetUser(req);
     if (userError) return res.status(userStatus).json({ success: false, error: userError });
 
@@ -126,7 +138,8 @@ exports.createRegistration = async (req, res, next) => {
       return res.status(409).json({ success: false, error: "Member can have at most 3 active workshop registrations" });
     }
     reserved.user = true;
-    const capacityOk = await reserveCapacity(workshop);
+    // Duplicate, past-date, and 3-active rules always apply; only capacity can be ignored.
+    const capacityOk = ignoreCapacity ? await forceCapacity(workshop) : await reserveCapacity(workshop);
     if (!capacityOk) {
       await releaseActiveSlot(userId);
       return res.status(409).json({ success: false, error: "Workshop capacity has been reached" });

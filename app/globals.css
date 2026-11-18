@@ -306,7 +306,8 @@
   white-space: nowrap;
 }
 .chip[aria-pressed="true"],
-.chip[aria-selected="true"] {
+.chip[aria-selected="true"],
+.chip[aria-checked="true"] {
   background: var(--ink);
   color: var(--paper);
 }
@@ -576,6 +577,51 @@ select.field-control {
   background-size: 6px 6px;
   background-repeat: no-repeat;
   cursor: pointer;
+}
+/* Read-only values in dialogs (current workshop, member). */
+.field-control[readonly] {
+  background: var(--paper);
+  color: var(--muted);
+}
+.field-control[readonly]:focus {
+  border: 2px solid var(--ink);
+  padding: 14px 16px;
+  box-shadow: none;
+}
+/* Flow 5 "Ignore Capacity": a square box with the 2px ink border. */
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.checkbox input {
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--white);
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+}
+.checkbox input:checked {
+  background: var(--violet);
+}
+.checkbox input:checked::after {
+  content: "";
+  width: 10px;
+  height: 6px;
+  border-left: 2.5px solid var(--white);
+  border-bottom: 2.5px solid var(--white);
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+.checkbox input:focus-visible {
+  outline: 3px solid var(--violet);
+  outline-offset: 2px;
 }
 .field-help {
   font-size: 13px;
@@ -912,23 +958,12 @@ select.field-control {
   line-height: 24px;
   white-space: nowrap;
 }
+.role-pill:disabled {
+  cursor: default;
+}
 .role-pill.is-admin {
   background: var(--violet);
   color: var(--white);
-}
-.role-pill select {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
-.role-pill select:disabled {
-  cursor: not-allowed;
-}
-.role-pill:has(select:focus-visible) {
-  outline: 3px solid var(--violet);
-  outline-offset: 2px;
 }
 
 /* ---------- Stat cards (admin) ---------- */

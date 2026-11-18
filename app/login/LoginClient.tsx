@@ -5,15 +5,17 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../lib/auth";
 import { errorText } from "../../lib/format";
-import { safeNext, useNextQuery } from "../../lib/hooks";
+import { useQueryParam } from "../../lib/hooks";
 import { AuthShell, TextField } from "../components/AuthShell";
 
 export function LoginClient() {
-  const [email, setEmail] = useState("");
+  // After sign-up (Flow 1), the log-in page opens with the new email filled in.
+  const prefill = useQueryParam("email");
+  const [typed, setEmail] = useState<string | null>(null);
+  const email = typed ?? prefill;
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const carry = useNextQuery();
   const { user, loading, login } = useAuth();
   const router = useRouter();
 
@@ -28,7 +30,8 @@ export function LoginClient() {
     setBusy(true);
     try {
       const signedIn = await login(email.trim(), password);
-      router.push(safeNext() ?? (signedIn.role === "admin" ? "/manage" : "/"));
+      // Flow 1: "User is admin?" yes -> Manage workshops (Flow 4), no -> Browse workshops (Flow 2).
+      router.push(signedIn.role === "admin" ? "/manage" : "/");
     } catch (err) {
       const msg = errorText(err);
       setError(/invalid credentials/i.test(msg) ? "The email or password is wrong. Check both and try again." : msg);
@@ -67,7 +70,7 @@ export function LoginClient() {
         </button>
         <p className="auth-switch">
           <span className="muted">No account?</span>
-          <Link href={`/register${carry}`} className="link-violet">
+          <Link href="/register" className="link-violet">
             Sign up
           </Link>
         </p>

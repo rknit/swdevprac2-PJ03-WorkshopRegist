@@ -318,6 +318,16 @@
  *             "type": "string",
  *             "pattern": "^[a-fA-F0-9]{24}$",
  *             "example": "507f1f77bcf86cd799439011"
+ *           },
+ *           "user": {
+ *             "type": "string",
+ *             "pattern": "^[a-fA-F0-9]{24}$",
+ *             "description": "Admin only, required for an admin: the member to register."
+ *           },
+ *           "ignoreCapacity": {
+ *             "type": "boolean",
+ *             "default": false,
+ *             "description": "Admin only (403 for a member). true takes a seat even when the workshop is full. The duplicate, past-date, and 3-active rules still apply."
  *           }
  *         },
  *         "required": [

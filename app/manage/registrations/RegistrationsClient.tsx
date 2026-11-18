@@ -2,17 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type Registration, type UserRow, type Workshop } from "../../../lib/api";
-import { dateDialog, dateShort, errorText, isPast } from "../../../lib/format";
+import { dateDialog, dateShort, errorText, isFull, isPast, seatsLeft, whenLabel } from "../../../lib/format";
 import { useToday } from "../../../lib/hooks";
 import { AdminGate } from "../../components/AdminGate";
-import { ChangeWorkshopDialog, ConfirmDialog, moveTargets } from "../../components/Dialogs";
-import { Avatar, Pagination, StatePanel, paginate } from "../../components/ui";
+import { ConfirmDialog, EditRegistrationDialog, moveTargets } from "../../components/Dialogs";
+import { Avatar, Button, Dialog, Pagination, StatePanel, paginate } from "../../components/ui";
 
 const PAGE_SIZE = 5;
 
 export function RegistrationsClient() {
   return (
-    <AdminGate title="Manage Registrations" next="/manage/registrations">
+    <AdminGate title="Manage Registrations">
       <ManageRegistrations />
     </AdminGate>
   );
@@ -30,6 +30,7 @@ function ManageRegistrations() {
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Registration | null>(null);
   const [deleting, setDeleting] = useState<Registration | null>(null);
+  const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(
@@ -81,7 +82,10 @@ function ManageRegistrations() {
 
   return (
     <div className="page">
-      <h1 className="t-display-l">Manage Registrations</h1>
+      <div className="page-head">
+        <h1 className="t-display-l">Manage Registrations</h1>
+        <Button onClick={() => setCreating(true)}>+ New registration</Button>
+      </div>
 
       <div className="row" style={{ gap: 8 }}>
         <span className="spacer" />
@@ -168,10 +172,10 @@ function ManageRegistrations() {
 
       <Pagination label="Registration table pages" page={current} total={total} onChange={setPage} />
 
-      <ChangeWorkshopDialog
+      <EditRegistrationDialog
         open={editing !== null}
         currentName={editing?.workshop?.name ?? ""}
-        who={editing?.user?.name ? `${editing.user.name}’s seat` : "this seat"}
+        member={editing?.user ? `${editing.user.name} (${editing.user.email})` : "Deleted user"}
         targets={editing && today ? moveTargets(workshops, today, heldBy(editing.user?._id)) : []}
         onClose={() => setEditing(null)}
         onSave={async (workshopId) => {
@@ -185,17 +189,17 @@ function ManageRegistrations() {
 
       <ConfirmDialog
         open={deleting !== null}
-        title="Delete this registration?"
+        title="Delete registration?"
         body={
           deleting && (
             <>
-              <strong>{deleting.user?.name ?? "This user"}</strong> will lose the seat in <strong>{deleting.workshop?.name ?? "this workshop"}</strong>
+              Remove the seat of <strong>{deleting.user?.name ?? "this member"}</strong> in <strong>{deleting.workshop?.name ?? "this workshop"}</strong>
               {deleting.workshop ? ` (${dateDialog(deleting.workshop.workshopDate)})` : ""}.
             </>
           )
         }
-        safeLabel="Keep it"
-        dangerLabel="Yes, delete"
+        safeLabel="Cancel"
+        dangerLabel="Delete"
         onClose={() => setDeleting(null)}
         onConfirm={async () => {
           if (!deleting) return;
@@ -206,7 +210,162 @@ function ManageRegistrations() {
         }}
       />
 
+      <NewRegistrationDialog
+        open={creating}
+        users={users.filter((u) => u.role === "member")}
+        workshops={today ? workshops.filter((w) => w.isActive && !isPast(w, today)).sort((a, b) => Date.parse(a.workshopDate) - Date.parse(b.workshopDate)) : []}
+        onClose={() => setCreating(false)}
+        onCreate={async (userId, workshopId, ignoreCapacity) => {
+          await api.createRegistration(workshopId, userId, ignoreCapacity);
+          setCreating(false);
+          setNotice("Registration created.");
+          await load();
+        }}
+      />
     </div>
+  );
+}
+
+// Flow 5 (22.3): "New registration" — member, workshop, and "Ignore Capacity".
+// Ignore Capacity lets the admin add a seat to a full workshop; the duplicate,
+// past-date, and 3-active rules still apply on the server.
+function NewRegistrationDialog({
+  open,
+  users,
+  workshops,
+  onClose,
+  onCreate,
+}: {
+  open: boolean;
+  users: UserRow[];
+  workshops: Workshop[];
+  onClose: () => void;
+  onCreate: (userId: string, workshopId: string, ignoreCapacity: boolean) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <Dialog open={open} onClose={busy ? () => undefined : onClose} title="New registration" bar="violet">
+      {/* <Dialog> mounts this only while open, so the form starts empty each time. */}
+      <NewRegistrationForm users={users} workshops={workshops} onClose={onClose} onCreate={onCreate} onBusy={setBusy} />
+    </Dialog>
+  );
+}
+
+function NewRegistrationForm({
+  users,
+  workshops,
+  onClose,
+  onCreate,
+  onBusy,
+}: {
+  users: UserRow[];
+  workshops: Workshop[];
+  onClose: () => void;
+  onCreate: (userId: string, workshopId: string, ignoreCapacity: boolean) => Promise<void>;
+  onBusy: (busy: boolean) => void;
+}) {
+  const [userId, setUserId] = useState("");
+  const [workshopId, setWorkshopId] = useState("");
+  const [ignoreCapacity, setIgnoreCapacity] = useState(false);
+  const [errors, setErrors] = useState<{ user?: string; workshop?: string; general?: string }>({});
+  const [busy, setBusyLocal] = useState(false);
+  const setBusy = (b: boolean) => {
+    setBusyLocal(b);
+    onBusy(b);
+  };
+  const chosen = workshops.find((w) => w._id === workshopId);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const found = {
+      user: userId ? undefined : "Pick a member.",
+      workshop: !workshopId ? "Pick a workshop." : chosen && isFull(chosen) && !ignoreCapacity ? "This workshop is full. Tick Ignore Capacity to add the seat anyway." : undefined,
+    };
+    setErrors(found);
+    if (found.user || found.workshop) return;
+    setBusy(true);
+    try {
+      await onCreate(userId, workshopId, ignoreCapacity);
+      onBusy(false);
+    } catch (err) {
+      setErrors({ general: errorText(err) });
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={(e) => void submit(e)} noValidate style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <div className="field">
+        <label className="field-label" htmlFor="new-reg-user">
+          Member
+        </label>
+        <select id="new-reg-user" className="field-control" value={userId} onChange={(e) => setUserId(e.target.value)} aria-invalid={errors.user ? true : undefined}>
+          <option value="">Select a member</option>
+          {users.map((u) => (
+            <option key={u._id} value={u._id}>
+              {u.name} ({u.email})
+            </option>
+          ))}
+        </select>
+        {errors.user && (
+          <p className="field-help" role="alert">
+            {errors.user}
+          </p>
+        )}
+      </div>
+      <div className="field">
+        <label className="field-label" htmlFor="new-reg-workshop">
+          Workshop name
+        </label>
+        <select
+          id="new-reg-workshop"
+          className="field-control"
+          value={workshopId}
+          onChange={(e) => {
+            setWorkshopId(e.target.value);
+            setErrors((x) => ({ ...x, workshop: undefined }));
+          }}
+          aria-invalid={errors.workshop ? true : undefined}
+        >
+          <option value="">Select a workshop</option>
+          {workshops.map((w) => (
+            <option key={w._id} value={w._id}>
+              {w.name} — {whenLabel(w)} ({isFull(w) ? "full" : `${seatsLeft(w)} left`})
+            </option>
+          ))}
+        </select>
+        {errors.workshop && (
+          <p className="field-help" role="alert">
+            {errors.workshop}
+          </p>
+        )}
+      </div>
+      {errors.general && (
+        <p className="notice notice-error" role="alert">
+          {errors.general}
+        </p>
+      )}
+      <div className="dialog-actions" style={{ alignItems: "center" }}>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={ignoreCapacity}
+            onChange={(e) => {
+              setIgnoreCapacity(e.target.checked);
+              setErrors((x) => ({ ...x, workshop: undefined }));
+            }}
+          />
+          <span>Ignore Capacity</span>
+        </label>
+        <span className="spacer" />
+        <Button variant="secondary" onClick={onClose} disabled={busy}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={busy}>
+          {busy ? "Saving…" : "Save changes"}
+        </Button>
+      </div>
+    </form>
   );
 }
 

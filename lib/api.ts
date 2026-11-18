@@ -101,10 +101,11 @@ export const api = {
     request<unknown>(`/api/v1/workshops/${id}`, { method: "DELETE" }),
   listRegistrations: () =>
     request<{ success: true; count: number; data: Registration[] }>("/api/v1/registrations"),
-  createRegistration: (workshopId: string, userId?: string) =>
+  // userId and ignoreCapacity are admin-only.
+  createRegistration: (workshopId: string, userId?: string, ignoreCapacity = false) =>
     request<{ success: true; data: Registration }>("/api/v1/registrations", {
       method: "POST",
-      body: JSON.stringify(userId ? { workshop: workshopId, user: userId } : { workshop: workshopId }),
+      body: JSON.stringify(userId ? { workshop: workshopId, user: userId, ...(ignoreCapacity ? { ignoreCapacity: true } : {}) } : { workshop: workshopId }),
     }),
   listUsers: () =>
     request<{ success: true; count: number; data: UserRow[] }>("/api/v1/users"),

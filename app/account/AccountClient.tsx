@@ -7,7 +7,7 @@ import { api, type Registration, type Workshop } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { coverFor, dateDialog, dayTwoDigit, errorText, isPast, monthShort, onCover } from "../../lib/format";
 import { useToday } from "../../lib/hooks";
-import { ChangeWorkshopDialog, ConfirmDialog, moveTargets } from "../components/Dialogs";
+import { ConfirmDialog, EditRegistrationDialog, moveTargets } from "../components/Dialogs";
 import { Button, ButtonLink, Icon, StatePanel } from "../components/ui";
 
 const MAX_ACTIVE = 3;
@@ -79,7 +79,7 @@ export function AccountClient() {
       <div className="page">
         <h1 className="t-display-l">My registrations</h1>
         <StatePanel title="Log in to see your registrations">
-          <ButtonLink href="/login?next=%2Faccount">Log in</ButtonLink>
+          <ButtonLink href="/login">Log in</ButtonLink>
         </StatePanel>
       </div>
     );
@@ -178,7 +178,7 @@ export function AccountClient() {
         </div>
       )}
 
-      <ChangeWorkshopDialog
+      <EditRegistrationDialog
         open={editing !== null}
         currentName={editing?.workshop.name ?? ""}
         targets={editing && today ? moveTargets(workshops, today, held) : []}

@@ -5,13 +5,13 @@ import { api, type UserRow } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { errorText } from "../../../lib/format";
 import { AdminGate } from "../../components/AdminGate";
-import { Avatar, StatePanel } from "../../components/ui";
+import { Avatar, Button, Dialog, StatePanel } from "../../components/ui";
 
 const MAX_ACTIVE = 3;
 
 export function UsersClient() {
   return (
-    <AdminGate title="Manage Users" next="/manage/users">
+    <AdminGate title="Manage Users">
       <ManageUsers />
     </AdminGate>
   );
@@ -25,6 +25,7 @@ function ManageUsers() {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [roleFor, setRoleFor] = useState<UserRow | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(
@@ -46,19 +47,19 @@ function ManageUsers() {
     void load();
   }, [load]);
 
-  const setRole = async (u: UserRow, role: "member" | "admin") => {
-    if (role === u.role) return;
-    setBusyId(u._id);
-    setError(null);
-    try {
-      await api.setRole(u._id, role);
-      setNotice(`${u.name} is now ${role === "admin" ? "an admin" : "a member"}.`);
-      await load();
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusyId(null);
+  // Flow 6 (23.1): "Apply" in the role dialog. Errors stay in the dialog.
+  const applyRole = async (u: UserRow, role: "member" | "admin") => {
+    if (role !== u.role) {
+      setBusyId(u._id);
+      try {
+        await api.setRole(u._id, role);
+        setNotice(`${u.name} is now ${role === "admin" ? "an admin" : "a member"}.`);
+        await load();
+      } finally {
+        setBusyId(null);
+      }
     }
+    setRoleFor(null);
   };
 
   return (
@@ -114,21 +115,20 @@ function ManageUsers() {
                           {u.activeSeats ?? 0} / {MAX_ACTIVE}
                         </td>
                         <td>
-                          <label className={u.role === "admin" ? "role-pill is-admin" : "role-pill"} title={self ? "You cannot change your own role." : undefined}>
-                            <span aria-hidden>
-                              {busyId === u._id ? "Saving…" : u.role === "admin" ? "Admin" : "Member"}
-                              <span className="caret">▾</span>
+                          {/* Flow 6: "Press Role" opens the role dialog. An admin cannot change their own role. */}
+                          <button
+                            type="button"
+                            className={u.role === "admin" ? "role-pill is-admin" : "role-pill"}
+                            aria-label={`Role for ${u.name}: ${u.role === "admin" ? "Admin" : "Member"}. Change role`}
+                            title={self ? "You cannot change your own role." : undefined}
+                            disabled={self || busyId === u._id}
+                            onClick={() => setRoleFor(u)}
+                          >
+                            {busyId === u._id ? "Saving…" : u.role === "admin" ? "Admin" : "Member"}
+                            <span className="caret" aria-hidden>
+                              ▾
                             </span>
-                            <select
-                              aria-label={`Role for ${u.name}`}
-                              value={u.role}
-                              disabled={self || busyId === u._id}
-                              onChange={(e) => void setRole(u, e.target.value as "member" | "admin")}
-                            >
-                              <option value="member">Member</option>
-                              <option value="admin">Admin</option>
-                            </select>
-                          </label>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -139,6 +139,64 @@ function ManageUsers() {
           </div>
         </div>
       )}
+
+      <Dialog open={roleFor !== null} onClose={busyId ? () => undefined : () => setRoleFor(null)} title="Change role for selected user" bar="violet">
+        {roleFor && <RoleForm user={roleFor} onClose={() => setRoleFor(null)} onApply={(role) => applyRole(roleFor, role)} />}
+      </Dialog>
     </div>
+  );
+}
+
+// Flow 6 (23.1): Role field showing the choice, Member / Admin options, Apply.
+function RoleForm({ user, onClose, onApply }: { user: UserRow; onClose: () => void; onApply: (role: "member" | "admin") => Promise<void> }) {
+  const [role, setRole] = useState<"member" | "admin">(user.role);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const label = (r: "member" | "admin") => (r === "admin" ? "Admin" : "Member");
+
+  const apply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await onApply(role);
+    } catch (err) {
+      setError(errorText(err));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={(e) => void apply(e)} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <p className="t-body muted">
+        {user.name} ({user.email})
+      </p>
+      <div className="field">
+        <label className="field-label" htmlFor="role-current">
+          Role
+        </label>
+        <input id="role-current" className="field-control" value={label(role)} readOnly />
+      </div>
+      <div className="chips" role="radiogroup" aria-label="Role">
+        {(["member", "admin"] as const).map((r) => (
+          <button key={r} type="button" role="radio" aria-checked={role === r} className="chip" onClick={() => setRole(r)}>
+            {label(r)}
+          </button>
+        ))}
+      </div>
+      {error && (
+        <p className="notice notice-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="dialog-actions">
+        <Button variant="secondary" onClick={onClose} disabled={busy}>
+          Cancel
+        </Button>
+        <Button type="submit" variant="dark" disabled={busy}>
+          {busy ? "Applying…" : "Apply"}
+        </Button>
+      </div>
+    </form>
   );
 }
