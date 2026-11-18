@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type Registration, type UserRow, type Workshop } from "../../../lib/api";
-import { dateDialog, dateShort, errorText, isFull, isPast, seatsLeft, whenLabel } from "../../../lib/format";
+import { dateDialog, dateShort, errorText, isPast } from "../../../lib/format";
 import { useToday } from "../../../lib/hooks";
 import { AdminGate } from "../../components/AdminGate";
 import { ChangeWorkshopDialog, ConfirmDialog, moveTargets } from "../../components/Dialogs";
-import { Avatar, Button, Dialog, Pagination, StatePanel, paginate } from "../../components/ui";
+import { Avatar, Pagination, StatePanel, paginate } from "../../components/ui";
 
 const PAGE_SIZE = 5;
 
@@ -30,7 +30,6 @@ function ManageRegistrations() {
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Registration | null>(null);
   const [deleting, setDeleting] = useState<Registration | null>(null);
-  const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(
@@ -82,10 +81,7 @@ function ManageRegistrations() {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <h1 className="t-display-l">Manage Registrations</h1>
-        <Button onClick={() => setCreating(true)}>+ New registration</Button>
-      </div>
+      <h1 className="t-display-l">Manage Registrations</h1>
 
       <div className="row" style={{ gap: 8 }}>
         <span className="spacer" />
@@ -110,11 +106,11 @@ function ManageRegistrations() {
             <table className="dtable" style={{ minWidth: 960 }}>
               <thead>
                 <tr>
-                  <th style={{ width: 300 }}>Member</th>
+                  <th style={{ width: 324 }}>Member</th>
                   <th>Workshop</th>
                   <th style={{ width: 170 }}>Workshop date</th>
                   <th style={{ width: 170 }}>Registered on</th>
-                  <th style={{ width: 150 }}>Actions</th>
+                  <th style={{ width: 174 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -210,18 +206,6 @@ function ManageRegistrations() {
         }}
       />
 
-      <NewRegistrationDialog
-        open={creating}
-        users={users}
-        workshops={today ? workshops.filter((w) => !isPast(w, today) && !isFull(w)).sort((a, b) => Date.parse(a.workshopDate) - Date.parse(b.workshopDate)) : []}
-        onClose={() => setCreating(false)}
-        onCreate={async (userId, workshopId) => {
-          const res = await api.createRegistration(workshopId, userId);
-          setCreating(false);
-          setNotice(`Registration created. ID ${res.data._id}.`);
-          await load();
-        }}
-      />
     </div>
   );
 }
@@ -244,113 +228,5 @@ function FilterPill({ label, value, options, onChange }: { label: string; value:
         ))}
       </select>
     </label>
-  );
-}
-
-// Admin creates a registration for any user. No Figma frame exists for this,
-// so it reuses the dialog and input styles.
-function NewRegistrationDialog({
-  open,
-  users,
-  workshops,
-  onClose,
-  onCreate,
-}: {
-  open: boolean;
-  users: UserRow[];
-  workshops: Workshop[];
-  onClose: () => void;
-  onCreate: (userId: string, workshopId: string) => Promise<void>;
-}) {
-  const [busy, setBusy] = useState(false);
-  return (
-    <Dialog open={open} onClose={busy ? () => undefined : onClose} title="New registration" bar="violet">
-      {/* <Dialog> mounts this only while open, so the form starts empty each time. */}
-      <NewRegistrationForm users={users} workshops={workshops} onClose={onClose} onCreate={onCreate} onBusy={setBusy} />
-    </Dialog>
-  );
-}
-
-function NewRegistrationForm({
-  users,
-  workshops,
-  onClose,
-  onCreate,
-  onBusy,
-}: {
-  users: UserRow[];
-  workshops: Workshop[];
-  onClose: () => void;
-  onCreate: (userId: string, workshopId: string) => Promise<void>;
-  onBusy: (busy: boolean) => void;
-}) {
-  const [userId, setUserId] = useState("");
-  const [workshopId, setWorkshopId] = useState("");
-  const [errors, setErrors] = useState<{ user?: string; workshop?: string; general?: string }>({});
-  const [busy, setBusyLocal] = useState(false);
-  const setBusy = (b: boolean) => {
-    setBusyLocal(b);
-    onBusy(b);
-  };
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const found = { user: userId ? undefined : "Pick a user.", workshop: workshopId ? undefined : "Pick a workshop." };
-    setErrors(found);
-    if (found.user || found.workshop) return;
-    setBusy(true);
-    try {
-      onBusy(false);
-      await onCreate(userId, workshopId);
-    } catch (err) {
-      setErrors({ general: errorText(err) });
-      setBusy(false);
-    }
-  };
-
-  return (
-    <form onSubmit={(e) => void submit(e)} noValidate style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <div className="field">
-        <label className="field-label" htmlFor="new-reg-user">
-          User
-        </label>
-        <select id="new-reg-user" className="field-control" value={userId} onChange={(e) => setUserId(e.target.value)} aria-invalid={errors.user ? true : undefined}>
-          <option value="">Pick a user</option>
-          {users.map((u) => (
-            <option key={u._id} value={u._id}>
-              {u.name} ({u.email}){u.role === "admin" ? " — admin" : ""}
-            </option>
-          ))}
-        </select>
-        {errors.user && <p className="field-help" role="alert">{errors.user}</p>}
-      </div>
-      <div className="field">
-        <label className="field-label" htmlFor="new-reg-workshop">
-          Workshop
-        </label>
-        <select id="new-reg-workshop" className="field-control" value={workshopId} onChange={(e) => setWorkshopId(e.target.value)} aria-invalid={errors.workshop ? true : undefined}>
-          <option value="">Pick a workshop</option>
-          {workshops.map((w) => (
-            <option key={w._id} value={w._id}>
-              {w.name} — {whenLabel(w)} ({seatsLeft(w)} left)
-            </option>
-          ))}
-        </select>
-        {errors.workshop && <p className="field-help" role="alert">{errors.workshop}</p>}
-      </div>
-      {errors.general && (
-        <p className="notice notice-error" role="alert">
-          {errors.general}
-        </p>
-      )}
-      <div className="dialog-actions">
-        <Button variant="secondary" onClick={onClose} disabled={busy}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={busy}>
-          {busy ? "Creating…" : "Create registration"}
-        </Button>
-      </div>
-    </form>
   );
 }

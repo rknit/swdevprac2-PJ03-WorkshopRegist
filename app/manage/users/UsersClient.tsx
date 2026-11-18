@@ -5,10 +5,9 @@ import { api, type UserRow } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { errorText } from "../../../lib/format";
 import { AdminGate } from "../../components/AdminGate";
-import { Avatar, Pagination, StatePanel, paginate } from "../../components/ui";
+import { Avatar, StatePanel } from "../../components/ui";
 
 const MAX_ACTIVE = 3;
-const PAGE_SIZE = 10;
 
 export function UsersClient() {
   return (
@@ -27,7 +26,6 @@ function ManageUsers() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
 
   const load = useCallback(
     () =>
@@ -63,8 +61,6 @@ function ManageUsers() {
     }
   };
 
-  const { total, current, items } = paginate(users, page, PAGE_SIZE);
-
   return (
     <div className="page">
       <h1 className="t-display-l">Manage Users</h1>
@@ -86,21 +82,21 @@ function ManageUsers() {
             <table className="dtable" style={{ minWidth: 820 }}>
               <thead>
                 <tr>
-                  <th style={{ width: "28%" }}>Member</th>
-                  <th style={{ width: "23%" }}>Phone</th>
-                  <th style={{ width: "23%" }}>Active seats</th>
+                  <th style={{ width: 384 }}>Member</th>
+                  <th style={{ width: 300 }}>Phone</th>
+                  <th style={{ width: 300 }}>Active seats</th>
                   <th>Role</th>
                 </tr>
               </thead>
               <tbody>
-                {items.length === 0 ? (
+                {users.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="dtable-empty">
                       No users yet.
                     </td>
                   </tr>
                 ) : (
-                  items.map((u) => {
+                  users.map((u) => {
                     const self = u._id === me?.id;
                     return (
                       <tr key={u._id}>
@@ -133,7 +129,6 @@ function ManageUsers() {
                               <option value="admin">Admin</option>
                             </select>
                           </label>
-                          {self && <span className="t-caption muted" style={{ marginLeft: 12 }}>You</span>}
                         </td>
                       </tr>
                     );
@@ -144,8 +139,6 @@ function ManageUsers() {
           </div>
         </div>
       )}
-
-      <Pagination label="User table pages" page={current} total={total} onChange={setPage} />
     </div>
   );
 }

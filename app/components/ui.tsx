@@ -120,7 +120,6 @@ function pageList(page: number, total: number): (number | "gap")[] {
 }
 
 export function Pagination({ page, total, onChange, label }: { page: number; total: number; onChange: (page: number) => void; label: string }) {
-  if (total <= 1) return null;
   return (
     <nav className="pagination" aria-label={label}>
       <ol>

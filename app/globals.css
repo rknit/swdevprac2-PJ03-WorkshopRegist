@@ -94,13 +94,22 @@
 
 /* ---------- Typography (Figma text styles) ---------- */
 
+/* Bricolage headings use automatic optical size: with it, rendered widths match
+   the design files exactly. "normal" stops the body's DM Sans "opsz" 14 from inheriting. */
+.t-display-xl,
+.t-display-l,
+.t-heading-m,
+.t-heading-s,
+.datestamp-day {
+  font-variation-settings: normal;
+}
+
 .t-display-xl {
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 80px;
   line-height: 80px;
   letter-spacing: -2.4px;
-  font-variation-settings: "opsz" 14, "wdth" 100;
 }
 .t-display-l {
   font-family: var(--font-display);
@@ -108,7 +117,6 @@
   font-size: 56px;
   line-height: 58px;
   letter-spacing: -1.12px;
-  font-variation-settings: "opsz" 14, "wdth" 100;
 }
 .t-heading-m {
   font-family: var(--font-display);
@@ -116,7 +124,6 @@
   font-size: 32px;
   line-height: 38px;
   letter-spacing: -0.32px;
-  font-variation-settings: "opsz" 14, "wdth" 100;
 }
 .t-heading-s {
   font-family: var(--font-display);
@@ -124,7 +131,6 @@
   font-size: 22px;
   line-height: 28px;
   letter-spacing: -0.11px;
-  font-variation-settings: "opsz" 14, "wdth" 100;
 }
 .t-body-l {
   font-size: 18px;
@@ -539,7 +545,24 @@
 textarea.field-control {
   min-height: 112px;
   padding-bottom: 40px;
-  resize: vertical;
+  resize: none;
+}
+.date-control {
+  position: relative;
+  cursor: pointer;
+}
+.date-control:focus-within {
+  border: 3px solid var(--violet);
+  padding: 13px 15px;
+  box-shadow: var(--shadow-4);
+}
+.date-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 textarea.field-control:focus,
 textarea.field-control[aria-invalid="true"] {
@@ -722,7 +745,6 @@ select.field-control {
   font-size: 32px;
   line-height: 38px;
   letter-spacing: -0.32px;
-  font-variation-settings: "opsz" 14, "wdth" 100;
 }
 .wcard-body {
   display: flex;
@@ -818,9 +840,11 @@ select.field-control {
 .dtable-scroll {
   overflow-x: auto;
 }
+/* Fixed layout: column widths are the Figma pixel widths; the column without a width takes the rest. */
 .dtable {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 /* Chromium paints a fill per cell, and percentage columns land on fractional
    pixels. The 1px shadow to the right covers the anti-aliased seam between cells. */
@@ -908,9 +932,6 @@ select.field-control {
 .role-pill select:disabled {
   cursor: not-allowed;
 }
-.role-pill:has(select:disabled) {
-  opacity: 0.45;
-}
 .role-pill:has(select:focus-visible) {
   outline: 3px solid var(--violet);
   outline-offset: 2px;
@@ -971,9 +992,10 @@ select.field-control {
   gap: 12px;
   flex-wrap: wrap;
 }
+/* Height follows the content, like the Figma drawer card. */
 .drawer {
   position: fixed;
-  inset: 16px 16px 16px auto;
+  inset: 16px 16px auto auto;
   width: min(520px, calc(100vw - 32px));
   height: auto;
   max-height: calc(100vh - 32px);
@@ -1098,6 +1120,7 @@ select.field-control {
   width: min(760px, calc(100% - 92px));
 }
 .banner-title {
+  text-wrap: balance;
   display: -webkit-box;
   overflow: hidden;
   -webkit-line-clamp: 3;
@@ -1198,11 +1221,6 @@ select.field-control {
 }
 .seats-big .t-display-xl {
   color: var(--violet);
-}
-.workshop-id {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
-  word-break: break-all;
 }
 
 /* ---------- My registrations ---------- */

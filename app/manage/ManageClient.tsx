@@ -13,14 +13,13 @@ type FormState = {
   description: string;
   instructor: string;
   workshopDate: string;
-  startTime: string;
   location: string;
   capacity: string;
 };
 type FormErrors = Partial<Record<keyof FormState, string>>;
 type Filter = "all" | "upcoming" | "ended" | "full";
 
-const EMPTY: FormState = { name: "", description: "", instructor: "", workshopDate: "", startTime: "", location: "", capacity: "" };
+const EMPTY: FormState = { name: "", description: "", instructor: "", workshopDate: "", location: "", capacity: "" };
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "upcoming", label: "Upcoming" },
@@ -167,13 +166,13 @@ function ManageWorkshops() {
             <table className="dtable" style={{ minWidth: 1100 }}>
               <thead>
                 <tr>
-                  <th style={{ width: "26%" }}>Workshop</th>
-                  <th style={{ width: "13%" }}>Date</th>
-                  <th style={{ width: "16%" }}>Instructor</th>
-                  <th style={{ width: "16%" }}>Location</th>
-                  <th style={{ width: "12%" }}>Seats</th>
-                  <th style={{ width: "8%" }}>Status</th>
-                  <th style={{ width: "9%" }}>Actions</th>
+                  <th style={{ width: 344 }}>Workshop</th>
+                  <th style={{ width: 160 }}>Date</th>
+                  <th style={{ width: 200 }}>Instructor</th>
+                  <th style={{ width: 200 }}>Location</th>
+                  <th style={{ width: 150 }}>Seats</th>
+                  <th style={{ width: 110 }}>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -189,10 +188,7 @@ function ManageWorkshops() {
                     return (
                       <tr key={w._id}>
                         <td className="cell-strong">{w.name}</td>
-                        <td className="cell-nowrap">
-                          {dateShort(w.workshopDate)}
-                          {w.startTime && <span className="muted"> · {w.startTime}</span>}
-                        </td>
+                        <td className="cell-nowrap">{dateShort(w.workshopDate)}</td>
                         <td>{w.instructor}</td>
                         <td>{w.location}</td>
                         <td>
@@ -300,7 +296,6 @@ const formFrom = (w: Workshop | null): FormState =>
         description: w.description,
         instructor: w.instructor,
         workshopDate: bkkDay(w.workshopDate),
-        startTime: w.startTime ?? "",
         location: w.location,
         capacity: String(w.capacity),
       }
@@ -344,7 +339,6 @@ function WorkshopForm({
     if (!/^\d{4}-\d{2}-\d{2}$/.test(form.workshopDate)) e.workshopDate = "Pick a date.";
     // The backend rejects any change to a past date. An edit that keeps the old date is allowed.
     else if (today && form.workshopDate < today && !(editing && bkkDay(editing.workshopDate) === form.workshopDate)) e.workshopDate = "Pick today or a later date.";
-    if (form.startTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(form.startTime)) e.startTime = "Use a 24-hour time, like 13:00.";
     const cap = Number(form.capacity);
     if (!Number.isInteger(cap) || cap < 1) e.capacity = "Enter a whole number, 1 or more.";
     else if (editing && cap < (editing.registeredCount ?? 0)) e.capacity = `${editing.registeredCount} seats are taken. Use ${editing.registeredCount} or more.`;
@@ -368,7 +362,6 @@ function WorkshopForm({
       instructor: form.instructor.trim(),
       location: form.location.trim(),
       capacity: Number(form.capacity),
-      startTime: form.startTime || null,
     };
     // Send the date only when it changed, so an admin can still edit other fields of a past workshop.
     if (!editing || bkkDay(editing.workshopDate) !== form.workshopDate) body.workshopDate = form.workshopDate;
@@ -380,7 +373,6 @@ function WorkshopForm({
       const msg = errorText(err);
       if (/date/i.test(msg)) setErrors({ workshopDate: msg });
       else if (/capacity/i.test(msg)) setErrors({ capacity: msg });
-      else if (/startTime/i.test(msg)) setErrors({ startTime: msg });
       else setGeneral(msg);
       setBusy(false);
     }
@@ -410,25 +402,33 @@ function WorkshopForm({
 
   return (
     <form onSubmit={(e) => void submit(e)} noValidate style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <h2 id="drawer-title" className="t-heading-m">
+      {/* The heading takes the first focus, so no field opens in its focus state. */}
+      <h2 id="drawer-title" className="t-heading-m" tabIndex={-1} autoFocus style={{ outline: "none" }}>
         {editing ? "Edit workshop" : "New workshop"}
       </h2>
       {field("name", "Workshop name", <input {...attrs("name")} />)}
       {field("description", "Description", <textarea {...attrs("description")} rows={3} />)}
       {field("instructor", "Instructor", <input {...attrs("instructor")} />)}
       <div className="field-row">
-        {field("workshopDate", "Workshop date", <input type="date" min={today || undefined} {...attrs("workshopDate")} />)}
-        {field("startTime", "Start time", <input type="time" {...attrs("startTime")} />)}
+        {field(
+          "workshopDate",
+          "Workshop date",
+          // The design shows "12 Nov 2026". A native date input shows the browser's
+          // format, so the box shows our text and an invisible date input sits on top.
+          <div className="field-control date-control" aria-invalid={errors.workshopDate ? true : undefined}>
+            <span className={form.workshopDate ? undefined : "muted"}>{form.workshopDate ? dateShort(`${form.workshopDate}T00:00:00Z`) : "Pick a date"}</span>
+            <input
+              type="date"
+              min={today || undefined}
+              {...attrs("workshopDate")}
+              className="date-native"
+              onClick={(e) => e.currentTarget.showPicker?.()}
+            />
+          </div>,
+        )}
+        {field("capacity", "Capacity", <input type="number" min={1} step={1} inputMode="numeric" {...attrs("capacity")} />)}
       </div>
-      <div className="field-row">
-        {field("location", "Location", <input {...attrs("location")} />)}
-        {field("capacity", "Capacity", <input type="number" min={1} step={1} inputMode="numeric" {...attrs("capacity")} />, "field field-narrow")}
-      </div>
-      {editing && (
-        <p className="t-caption muted">
-          Workshop ID <span className="workshop-id">{editing._id}</span>
-        </p>
-      )}
+      {field("location", "Location", <input {...attrs("location")} />)}
       {general && (
         <p className="notice notice-error" role="alert">
           {general}

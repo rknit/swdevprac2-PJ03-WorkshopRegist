@@ -7,7 +7,7 @@ import { api, type Registration, type Workshop } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { coverFor, dateLong, errorText, isFull, isPast, onCover, seatsLeft } from "../../../lib/format";
 import { useToday } from "../../../lib/hooks";
-import { Badge, Button, ButtonLink, CapacityBar, Icon, StatePanel, workshopStatus, type BadgeStatus } from "../../components/ui";
+import { Badge, Button, ButtonLink, CapacityBar, Icon, StatePanel, workshopStatus } from "../../components/ui";
 
 // The spec limits a member to 3 registrations on active (today or later) workshops.
 const MAX_ACTIVE = 3;
@@ -95,7 +95,8 @@ export function WorkshopDetail({ id }: { id: string }) {
   const past = today ? isPast(workshop, today) : false;
   const registered = Boolean(mine?.some((r) => r.workshop?._id === workshop._id));
   const activeCount = mine ? mine.filter((r) => r.workshop && r.workshop.isActive && today && !isPast(r.workshop, today)).length : 0;
-  const status = registered ? { status: "registered" as BadgeStatus, label: "Registered" } : workshopStatus(workshop, today);
+  // The banner shows the workshop status; the member's own state is in the register panel.
+  const status = workshopStatus(workshop, today);
 
   return (
     <div className="page" style={{ paddingTop: 32 }}>
@@ -142,9 +143,6 @@ export function WorkshopDetail({ id }: { id: string }) {
               {error}
             </p>
           )}
-          <p className="t-caption muted">
-            Workshop ID <span className="workshop-id">{workshop._id}</span>
-          </p>
         </aside>
       </div>
     </div>
@@ -250,8 +248,8 @@ function RegisterPanel({
           Edit workshop
         </ButtonLink>
       ) : role === "guest" ? (
-        <ButtonLink href={`/login?next=${encodeURIComponent(`/workshop/${workshop._id}`)}`} block>
-          Log in to register
+        <ButtonLink href={`/login?next=${encodeURIComponent(`/workshop/${workshop._id}`)}`} variant="mint" block>
+          Sign In to Register
         </ButtonLink>
       ) : (
         <Button block disabled>
