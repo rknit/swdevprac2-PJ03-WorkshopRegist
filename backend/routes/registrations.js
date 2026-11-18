@@ -192,7 +192,7 @@
  *         "Registrations"
  *       ],
  *       "summary": "Update registration",
- *       "description": "Owner or admin only. Move a registration to another workshop. Rechecks date, duplicate, capacity and active limit for the original owner, excluding the record being edited. Ownership cannot change.",
+ *       "description": "Owner or admin only. Edits the note (members: upcoming registrations only) and, for admins, attendance (from the workshop day on). A registration cannot move to another workshop: sending workshop returns 400.",
  *       "security": [
  *         {
  *           "bearerAuth": []

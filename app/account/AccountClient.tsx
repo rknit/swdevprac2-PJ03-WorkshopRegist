@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type Registration, type Workshop } from "../../lib/api";
+import { api, type Registration } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { coverFor, dateDialog, dayTwoDigit, errorText, isPast, monthShort, onCover } from "../../lib/format";
 import { useToday } from "../../lib/hooks";
-import { ConfirmDialog, EditRegistrationDialog, moveTargets } from "../components/Dialogs";
+import { ConfirmDialog, EditRegistrationDialog } from "../components/Dialogs";
 import { Button, ButtonLink, Icon, StatePanel } from "../components/ui";
 
 const MAX_ACTIVE = 3;
@@ -18,7 +18,6 @@ export function AccountClient() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [registrations, setRegistrations] = useState<Registration[]>([]);
-  const [workshops, setWorkshops] = useState<Workshop[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const today = useToday();
@@ -34,11 +33,11 @@ export function AccountClient() {
 
   const load = useCallback(
     () =>
-      Promise.all([api.listRegistrations(), api.listWorkshops()])
+      api
+        .listRegistrations()
         .then(
-          ([regs, ws]) => {
+          (regs) => {
             setRegistrations(regs.data);
-            setWorkshops(ws.data);
             setError(null);
           },
           (e) => setError(errorText(e)),
@@ -87,7 +86,6 @@ export function AccountClient() {
 
   const active = upcoming.length;
   const free = Math.max(0, MAX_ACTIVE - active);
-  const held = new Set(registrations.map((r) => r.workshop?._id).filter(Boolean) as string[]);
   const pastCount = past.length + removed.length;
 
   return (
@@ -137,7 +135,7 @@ export function AccountClient() {
         <div id="panel-upcoming" role="tabpanel" aria-labelledby="tab-upcoming" className="reg-list">
           {upcoming.map((r) => (
             <RegRow key={r._id} reg={r}>
-              <Button variant="mint" onClick={() => setEditing(r)} aria-label={`Change workshop for ${r.workshop.name}`}>
+              <Button variant="mint" onClick={() => setEditing(r)} aria-label={`Edit registration for ${r.workshop.name}`}>
                 Edit
               </Button>
               <Button variant="secondary" onClick={() => setCancelling(r)} aria-label={`Cancel seat in ${r.workshop.name}`}>
@@ -179,15 +177,15 @@ export function AccountClient() {
       )}
 
       <EditRegistrationDialog
-        open={editing !== null}
-        currentName={editing?.workshop.name ?? ""}
-        targets={editing && today ? moveTargets(workshops, today, held) : []}
+        registration={editing}
+        isAdmin={false}
+        today={today}
         onClose={() => setEditing(null)}
-        onSave={async (workshopId) => {
+        onSave={async (body) => {
           if (!editing) return;
-          const res = await api.updateRegistration(editing._id, workshopId);
+          await api.updateRegistration(editing._id, { note: body.note });
           setEditing(null);
-          setNotice(`Your seat moved to ${res.data.workshop?.name ?? "the new workshop"}.`);
+          setNotice("Your registration was saved.");
           await load();
         }}
       />
@@ -265,6 +263,7 @@ function RegRow({ reg, past = false, removed = false, children }: { reg: RegWith
             <span>{w.location}</span>
           </span>
         </div>
+        {reg.note && <p className="reg-note">Note: {reg.note}</p>}
       </div>
       {children && <div className="reg-actions">{children}</div>}
     </div>

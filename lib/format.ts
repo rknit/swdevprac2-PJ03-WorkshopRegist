@@ -41,6 +41,17 @@ export function whenLabel(w: Pick<Workshop, "workshopDate" | "startTime">): stri
   return w.startTime ? `${date} · ${w.startTime}` : date;
 }
 
+// Time card value: "13:00 – 16:00", "13:00", or "To be announced".
+export function timeRange(w: Pick<Workshop, "startTime" | "endTime">): string {
+  if (!w.startTime) return "To be announced";
+  return w.endTime ? `${w.startTime} – ${w.endTime}` : w.startTime;
+}
+
+// Attendance can be recorded from the workshop day on (Bangkok calendar).
+export const attendanceOpen = (w: Pick<Workshop, "workshopDate">, today: string) => Boolean(today) && bkkDay(w.workshopDate) <= today;
+
+export const ATTENDANCE_LABEL = { registered: "Registered", attended: "Attended", "no-show": "No-show" } as const;
+
 // A workshop is past when its Bangkok day is before today. This matches the
 // backend: registration closes after the workshop day.
 export const isPast = (w: Pick<Workshop, "workshopDate">, today: string) => bkkDay(w.workshopDate) < today;

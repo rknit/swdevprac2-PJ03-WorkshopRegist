@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type Registration, type UserRow, type Workshop } from "../../../lib/api";
-import { dateDialog, dateShort, errorText, isFull, isPast, seatsLeft, whenLabel } from "../../../lib/format";
+import { ATTENDANCE_LABEL, dateDialog, dateShort, errorText, isFull, isPast, seatsLeft, whenLabel } from "../../../lib/format";
 import { useToday } from "../../../lib/hooks";
 import { AdminGate } from "../../components/AdminGate";
-import { ConfirmDialog, EditRegistrationDialog, moveTargets } from "../../components/Dialogs";
-import { Avatar, Button, Dialog, Pagination, StatePanel, paginate } from "../../components/ui";
+import { ConfirmDialog, EditRegistrationDialog } from "../../components/Dialogs";
+import { Avatar, Badge, Button, Dialog, Pagination, StatePanel, paginate } from "../../components/ui";
 
 const PAGE_SIZE = 5;
 
@@ -78,7 +78,6 @@ function ManageRegistrations() {
     return [...map].sort((a, b) => a[1].localeCompare(b[1]));
   }, [users, registrations]);
 
-  const heldBy = (userId: string | undefined) => new Set(registrations.filter((r) => r.user?._id === userId).map((r) => r.workshop?._id).filter(Boolean) as string[]);
 
   return (
     <div className="page">
@@ -126,7 +125,6 @@ function ManageRegistrations() {
                   </tr>
                 ) : (
                   items.map((r) => {
-                    const canMove = Boolean(r.workshop && r.workshop.isActive && today && !isPast(r.workshop, today));
                     return (
                       <tr key={r._id}>
                         <td>
@@ -145,16 +143,20 @@ function ManageRegistrations() {
                         <td>
                           {r.workshop ? r.workshop.name : <span className="muted">Deleted workshop</span>}
                           {r.workshop && !r.workshop.isActive && <span className="t-caption muted"> (removed)</span>}
+                          {r.attendance && r.attendance !== "registered" && (
+                            <div style={{ marginTop: 6 }}>
+                              <Badge status={r.attendance === "attended" ? "open" : "full"}>{ATTENDANCE_LABEL[r.attendance]}</Badge>
+                            </div>
+                          )}
+                          {r.note && <p className="reg-note" style={{ marginTop: 4 }}>Note: {r.note}</p>}
                         </td>
                         <td className="cell-nowrap">{r.workshop ? dateShort(r.workshop.workshopDate) : "—"}</td>
                         <td className="cell-nowrap">{dateShort(r.createdAt)}</td>
                         <td>
                           <div className="cell-actions">
-                            {canMove && (
-                              <button type="button" className="link-action link-edit" onClick={() => setEditing(r)} aria-label={`Change workshop for ${r.user?.name ?? "this registration"}`}>
-                                Edit
-                              </button>
-                            )}
+                            <button type="button" className="link-action link-edit" onClick={() => setEditing(r)} aria-label={`Edit registration of ${r.user?.name ?? "this user"}`}>
+                              Edit
+                            </button>
                             <button type="button" className="link-action link-danger" onClick={() => setDeleting(r)} aria-label={`Delete registration of ${r.user?.name ?? "this user"}`}>
                               Delete
                             </button>
@@ -173,16 +175,15 @@ function ManageRegistrations() {
       <Pagination label="Registration table pages" page={current} total={total} onChange={setPage} />
 
       <EditRegistrationDialog
-        open={editing !== null}
-        currentName={editing?.workshop?.name ?? ""}
-        member={editing?.user ? `${editing.user.name} (${editing.user.email})` : "Deleted user"}
-        targets={editing && today ? moveTargets(workshops, today, heldBy(editing.user?._id)) : []}
+        registration={editing}
+        isAdmin
+        today={today}
         onClose={() => setEditing(null)}
-        onSave={async (workshopId) => {
+        onSave={async (body) => {
           if (!editing) return;
-          await api.updateRegistration(editing._id, workshopId);
+          await api.updateRegistration(editing._id, body);
           setEditing(null);
-          setNotice("Registration moved.");
+          setNotice("Registration saved.");
           await load();
         }}
       />

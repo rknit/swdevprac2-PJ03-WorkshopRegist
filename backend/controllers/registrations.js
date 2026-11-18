@@ -6,9 +6,13 @@ const { bangkokTodayStart } = require("../lib/dates");
 // A user may hold at most this many registrations on still-active workshops.
 const MAX_ACTIVE = 3;
 
-const populateRegistration = (query) => query
-  .populate("workshop", "name description instructor workshopDate startTime coverImage location capacity registeredCount isActive")
-  .populate("user", "name email tel role");
+const populateRegistration = (query, req) => {
+  const populated = query
+    .populate("workshop", "name description instructor workshopDate startTime endTime coverImage location capacity registeredCount isActive")
+    .populate("user", "name email tel role");
+  // Attendance is an admin-only field: members never receive it.
+  return req && req.user.role !== "admin" ? populated.select("-attendance") : populated;
+};
 
 // The Bangkok calendar day (UTC+7) is the "today" for all date rules.
 const bangkokToday = () => bangkokTodayStart();
@@ -28,7 +32,7 @@ const liveActiveCount = async (userId) => {
 // Duplicate + past-date checks. Capacity and the 3-active limit are NOT
 // checked here: both are enforced by atomic conditional increments (the
 // "gates"), which cannot be bypassed by concurrent requests.
-const validateRegistration = async ({ workshopId, user, excludeId }) => {
+const validateRegistration = async ({ workshopId, user }) => {
   if (typeof workshopId !== "string" || !/^[a-fA-F0-9]{24}$/.test(workshopId)) {
     return { status: 400, error: "A valid workshop ID is required" };
   }
@@ -38,8 +42,7 @@ const validateRegistration = async ({ workshopId, user, excludeId }) => {
   if (workshop.workshopDate < today) {
     return { status: 400, error: "Cannot register after the workshop date" };
   }
-  const exclude = excludeId ? { _id: { $ne: excludeId } } : {};
-  const duplicate = await Registration.findOne({ user, workshop: workshop.id, ...exclude });
+  const duplicate = await Registration.findOne({ user, workshop: workshop.id });
   if (duplicate) return { status: 409, error: "Member is already registered for this workshop" };
   return { workshop, today };
 };
@@ -96,7 +99,7 @@ const resolveTargetUser = async (req) => {
 exports.getRegistrations = async (req, res, next) => {
   try {
     const filter = req.user.role === "admin" ? {} : { user: req.user.id };
-    const registrations = await populateRegistration(Registration.find(filter).sort({ createdAt: 1 }));
+    const registrations = await populateRegistration(Registration.find(filter).sort({ createdAt: 1 }), req);
     res.status(200).json({ success: true, count: registrations.length, data: registrations });
   } catch (error) {
     next(error);
@@ -105,7 +108,7 @@ exports.getRegistrations = async (req, res, next) => {
 
 exports.getRegistration = async (req, res, next) => {
   try {
-    const registration = await populateRegistration(Registration.findById(req.params.id));
+    const registration = await populateRegistration(Registration.findById(req.params.id), req);
     if (!registration) return res.status(404).json({ success: false, error: "Registration not found" });
     if (req.user.role !== "admin" && registration.user._id.toString() !== req.user.id) {
       return res.status(403).json({ success: false, error: "Not authorized to view this registration" });
@@ -147,7 +150,7 @@ exports.createRegistration = async (req, res, next) => {
     reserved.workshop = workshop.id;
 
     const registration = await Registration.create({ workshop: workshop.id, user: userId });
-    res.status(201).json({ success: true, data: await populateRegistration(Registration.findById(registration.id)) });
+    res.status(201).json({ success: true, data: await populateRegistration(Registration.findById(registration.id), req) });
   } catch (error) {
     // A concurrent duplicate can still trip the unique compound index.
     if (error.code === 11000) {
@@ -159,69 +162,54 @@ exports.createRegistration = async (req, res, next) => {
   }
 };
 
+// Edit a registration: the note (owner member or admin) and attendance (admin).
+// A registration cannot move to another workshop: delete it and register again.
+const ATTENDANCE = ["registered", "attended", "no-show"];
+
 exports.updateRegistration = async (req, res, next) => {
   try {
     const registration = await Registration.findById(req.params.id);
     if (!registration) return res.status(404).json({ success: false, error: "Registration not found" });
-    if (req.user.role !== "admin" && registration.user.toString() !== req.user.id) {
+    const isAdmin = req.user.role === "admin";
+    if (!isAdmin && registration.user.toString() !== req.user.id) {
       return res.status(403).json({ success: false, error: "Not authorized to edit this registration" });
     }
-    const workshopId = req.body.workshop === undefined ? registration.workshop.toString() : req.body.workshop;
+    if (req.body.workshop !== undefined) {
+      return res.status(400).json({ success: false, error: "A registration cannot move to another workshop. Delete it and register again." });
+    }
+
+    const update = {};
+    if (req.body.note !== undefined) {
+      if (typeof req.body.note !== "string") return res.status(400).json({ success: false, error: "note must be text" });
+      const note = req.body.note.trim();
+      if (note.length > 300) return res.status(400).json({ success: false, error: "Note can be at most 300 characters" });
+      update.note = note;
+    }
+    if (req.body.attendance !== undefined) {
+      if (!isAdmin) return res.status(403).json({ success: false, error: "Only an admin can set attendance" });
+      if (!ATTENDANCE.includes(req.body.attendance)) {
+        return res.status(400).json({ success: false, error: "attendance must be registered, attended, or no-show" });
+      }
+      update.attendance = req.body.attendance;
+    }
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ success: false, error: "Nothing to update: send note or attendance" });
+    }
+
+    const workshop = await Workshop.findById(registration.workshop.toString());
     const today = bangkokToday();
-
-    if (workshopId === registration.workshop.toString()) {
-      // No-op edit: just re-check the current workshop is still registerable.
-      const workshop = await Workshop.findById(registration.workshop.toString());
-      if (!workshop || !workshop.isActive || workshop.workshopDate < today) {
-        return res.status(400).json({ success: false, error: "Cannot register after the workshop date" });
-      }
-      return res.status(200).json({ success: true, data: await populateRegistration(Registration.findById(registration.id)) });
+    // A member edits only an upcoming registration; an admin can edit any.
+    if (!isAdmin && (!workshop || !workshop.isActive || workshop.workshopDate < today)) {
+      return res.status(400).json({ success: false, error: "Cannot edit a registration after the workshop date" });
+    }
+    // Attendance is known only from the workshop day on.
+    if (update.attendance !== undefined && update.attendance !== "registered" && workshop && workshop.workshopDate >= new Date(today.getTime() + 24 * 60 * 60 * 1000)) {
+      return res.status(400).json({ success: false, error: "Attendance can be set from the workshop day on" });
     }
 
-    const validated = await validateRegistration({ workshopId, user: registration.user, excludeId: registration.id });
-    if (validated.error) return res.status(validated.status).json({ success: false, error: validated.error });
-    const { workshop } = validated;
-
-    const oldWorkshop = await Workshop.findById(registration.workshop.toString());
-    const oldActive = Boolean(oldWorkshop && oldWorkshop.isActive && isActiveOn(oldWorkshop.workshopDate, today));
-    const newActive = Boolean(workshop.isActive && isActiveOn(workshop.workshopDate, today));
-
-    // Moving from an inactive workshop to an active one takes a 3-active slot.
-    if (newActive && !oldActive && !(await reserveActiveSlot(registration.user))) {
-      return res.status(409).json({ success: false, error: "Member can have at most 3 active workshop registrations" });
-    }
-    // Moving from an active workshop to an inactive one frees the slot.
-    if (oldActive && !newActive) await releaseActiveSlot(registration.user);
-
-    let reserved = { user: false, workshop: null };
-    try {
-      const capacityOk = await reserveCapacity(workshop);
-      if (!capacityOk) {
-        // Undo the reservations made for this move.
-        if (newActive && !oldActive) await releaseActiveSlot(registration.user);
-        else if (oldActive && !newActive) await User.updateOne({ _id: registration.user }, { $inc: { activeCount: 1 } });
-        return res.status(409).json({ success: false, error: "Workshop capacity has been reached" });
-      }
-      reserved = { user: newActive && !oldActive, workshop: workshop.id };
-
-      const updated = await Registration.findByIdAndUpdate(
-        req.params.id,
-        { workshop: workshop.id },
-        { new: true, runValidators: true },
-      );
-      await releaseCapacity(registration.workshop.toString());
-      if (!updated) return res.status(404).json({ success: false, error: "Registration not found" });
-      res.status(200).json({ success: true, data: await populateRegistration(Registration.findById(updated.id)) });
-    } catch (error) {
-      // Roll back the reservations so a failed move leaks no capacity or slots.
-      if (reserved.user) await releaseActiveSlot(registration.user);
-      if (reserved.workshop) await releaseCapacity(reserved.workshop);
-      throw error;
-    }
+    await Registration.updateOne({ _id: registration.id }, update, { runValidators: true });
+    res.status(200).json({ success: true, data: await populateRegistration(Registration.findById(registration.id), req) });
   } catch (error) {
-    if (error.code === 11000) {
-      return res.status(409).json({ success: false, error: "Member is already registered for this workshop" });
-    }
     next(error);
   }
 };

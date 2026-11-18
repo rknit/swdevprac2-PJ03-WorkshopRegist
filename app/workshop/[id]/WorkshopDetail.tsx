@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, type Registration, type Workshop } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
-import { coverFor, dateLong, errorText, isFull, isPast, onCover, seatsLeft } from "../../../lib/format";
+import { coverFor, dateLong, errorText, isFull, isPast, onCover, seatsLeft, timeRange } from "../../../lib/format";
 import { useToday } from "../../../lib/hooks";
 import { Badge, Button, ButtonLink, CapacityBar, CoverImage, Icon, StatePanel, workshopStatus } from "../../components/ui";
 
@@ -118,7 +118,7 @@ export function WorkshopDetail({ id }: { id: string }) {
           <div className="facts">
             <Fact icon="user" tint="var(--sun)" label="Instructor" value={workshop.instructor} />
             <Fact icon="calendar" tint="var(--pink)" label="Date" value={dateLong(workshop.workshopDate)} />
-            {workshop.startTime && <Fact icon="clock" tint="var(--mint)" label="Time" value={workshop.startTime} />}
+            <Fact icon="clock" tint="var(--mint)" label="Time" value={timeRange(workshop)} />
             <Fact icon="pin" tint="var(--sky)" label="Location" value={workshop.location} />
           </div>
           <h2 className="t-heading-m">About this workshop</h2>

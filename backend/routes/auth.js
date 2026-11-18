@@ -183,6 +183,12 @@
  *             "example": "https://picsum.photos/id/1/1200/600",
  *             "description": "Optional banner image URL (http or https, at most 2048 characters). Send null or an empty string to clear it."
  *           },
+ *           "endTime": {
+ *             "type": "string",
+ *             "nullable": true,
+ *             "example": "16:00",
+ *             "description": "Optional end time in HH:mm (24-hour), Asia/Bangkok time. Needs a startTime and must be later than it."
+ *           },
  *           "startTime": {
  *             "type": "string",
  *             "nullable": true,
@@ -236,6 +242,12 @@
  *             "example": "https://picsum.photos/id/1/1200/600",
  *             "description": "Optional banner image URL (http or https, at most 2048 characters). Send null or an empty string to clear it."
  *           },
+ *           "endTime": {
+ *             "type": "string",
+ *             "nullable": true,
+ *             "example": "16:00",
+ *             "description": "Optional end time in HH:mm (24-hour), Asia/Bangkok time. Needs a startTime and must be later than it."
+ *           },
  *           "startTime": {
  *             "type": "string",
  *             "nullable": true,
@@ -282,6 +294,11 @@
  *             "type": "string",
  *             "nullable": true,
  *             "example": "13:00"
+ *           },
+ *           "endTime": {
+ *             "type": "string",
+ *             "nullable": true,
+ *             "example": "16:00"
  *           },
  *           "coverImage": {
  *             "type": "string",
@@ -337,13 +354,18 @@
  *       "RegistrationUpdate": {
  *         "type": "object",
  *         "properties": {
- *           "workshop": {
+ *           "note": {
  *             "type": "string",
- *             "pattern": "^[a-fA-F0-9]{24}$",
- *             "example": "507f1f77bcf86cd799439011"
+ *             "maxLength": 300,
+ *             "description": "Free-text note. The owner member (upcoming registrations only) or an admin can set it."
+ *           },
+ *           "attendance": {
+ *             "type": "string",
+ *             "enum": ["registered", "attended", "no-show"],
+ *             "description": "Admin only (403 for a member), from the workshop day on. Never returned to members."
  *           }
  *         },
- *         "description": "Move to another eligible workshop; omitted workshop keeps the existing value. Ownership cannot change."
+ *         "description": "Edit the note and attendance. A registration cannot move to another workshop: sending workshop returns 400. Delete it and register again."
  *       },
  *       "Registration": {
  *         "type": "object",

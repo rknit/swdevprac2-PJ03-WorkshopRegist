@@ -31,7 +31,7 @@ A RESTful backend API for discovering workshops and managing member registration
 - Members can view, update, and delete their own registrations
 - Admins can view, update, and delete any registration; creation is member-only
 - Each registration has its own ID and references its workshop and authenticated member
-- Editing moves a registration to another eligible workshop; omitted workshop retains the current value
+- Editing changes the note (owner or admin; members only before the workshop date) and attendance (admin only, from the workshop day on). A registration cannot move to another workshop: delete it and register again
 - Ownership comes from authentication and cannot be changed through request bodies
 - Deletion permanently removes the registration and frees its workshop seat
 
@@ -44,7 +44,7 @@ A RESTful backend API for discovering workshops and managing member registration
 - An active registration refers to a workshop with `isActive=true` and `workshopDate` today or later; past or soft-deleted workshops do not count toward the three-workshop limit
 - Create and update enforce the same rules; an update excludes its own record from duplicate, capacity, and active-count checks
 - Changing a workshop's date cannot reactivate registrations in a way that exceeds any member's active-registration limit
-- History remains readable/deletable after the workshop date or workshop deletion. Editing requires an eligible target workshop
+- History remains readable/deletable after the workshop date or workshop deletion. Members can edit the note only before the workshop date
 - Workshop and registration mutations are serialized within one Node.js process; the database also has a unique index on `(user, workshop)` to prevent duplicate registrations
 
 The count-based capacity and active-registration checks assume one backend process. Multiple server processes require database-level transaction/locking coordination to enforce those counts across instances. No approval, waitlist, attendance tracking, or payment workflow is specified.
@@ -135,13 +135,14 @@ Successful responses use `{ success: true, data }`, with `count` for lists. Regi
   "instructor": "Example Instructor",
   "workshopDate": "2026-12-01",
   "startTime": "13:00",
+  "endTime": "16:00",
   "coverImage": "https://picsum.photos/id/1/1200/600",
   "location": "Training room A",
   "capacity": 20
 }
 ```
 
-Use a date that is today or later when trying this example. `startTime` is optional. It uses `HH:mm` (24-hour) in Asia/Bangkok time and does not change any date rule. `coverImage` is optional: an `http(s)` URL for the workshop banner image.
+Use a date that is today or later when trying this example. `startTime` and `endTime` are optional; `endTime` needs a `startTime` and must be later. It uses `HH:mm` (24-hour) in Asia/Bangkok time and does not change any date rule. `coverImage` is optional: an `http(s)` URL for the workshop banner image.
 
 ### Registration Request Example
 
@@ -151,7 +152,7 @@ Use a date that is today or later when trying this example. `startTime` is optio
 }
 ```
 
-The workshop ID comes from the workshop response's `_id`. To move an existing registration, send the same body with the new workshop ID using `PUT /api/v1/registrations/:id`.
+The workshop ID comes from the workshop response's `_id`. To edit an existing registration, send `{ "note": "..." }` (and, as an admin, `"attendance": "attended"`) with `PUT /api/v1/registrations/:id`.
 
 Send `Authorization: Bearer <JWT>` with protected requests. In Swagger, click **Authorize** and paste `data.token` without the `Bearer ` prefix.
 

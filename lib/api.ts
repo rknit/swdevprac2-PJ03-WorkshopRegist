@@ -18,6 +18,8 @@ export type Workshop = {
   workshopDate: string;
   // Optional "HH:mm" start time, Asia/Bangkok.
   startTime?: string | null;
+  // Optional "HH:mm" end time, later than startTime.
+  endTime?: string | null;
   // Optional banner image (http(s) URL) for the card cover and the detail banner.
   coverImage?: string | null;
   location: string;
@@ -38,10 +40,16 @@ export type UserRow = {
 
 export type Registration = {
   _id: string;
-  workshop: Pick<Workshop, "_id" | "name" | "description" | "instructor" | "workshopDate" | "startTime" | "coverImage" | "location" | "capacity" | "registeredCount" | "isActive"> | null;
+  workshop: Pick<Workshop, "_id" | "name" | "description" | "instructor" | "workshopDate" | "startTime" | "endTime" | "coverImage" | "location" | "capacity" | "registeredCount" | "isActive"> | null;
   user: { _id: string; name: string; email: string; tel: string; role: string } | null;
+  // Free-text note (member and admin).
+  note?: string;
+  // Admin-only: the API never sends it to members.
+  attendance?: Attendance;
   createdAt: string;
 };
+
+export type Attendance = "registered" | "attended" | "no-show";
 
 export class ApiError extends Error {
   status: number;
@@ -111,8 +119,9 @@ export const api = {
     request<{ success: true; count: number; data: UserRow[] }>("/api/v1/users"),
   setRole: (userId: string, role: "member" | "admin") =>
     request<{ success: true; data: User }>(`/api/v1/users/${userId}/role`, { method: "PUT", body: JSON.stringify({ role }) }),
-  updateRegistration: (id: string, workshopId: string) =>
-    request<{ success: true; data: Registration }>(`/api/v1/registrations/${id}`, { method: "PUT", body: JSON.stringify({ workshop: workshopId }) }),
+  // Edit the note (owner or admin) and attendance (admin only).
+  updateRegistration: (id: string, body: { note?: string; attendance?: Attendance }) =>
+    request<{ success: true; data: Registration }>(`/api/v1/registrations/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteRegistration: (id: string) =>
     request<unknown>(`/api/v1/registrations/${id}`, { method: "DELETE" }),
 };

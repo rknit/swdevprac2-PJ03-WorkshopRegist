@@ -15,6 +15,12 @@ const WorkshopSchema = new mongoose.Schema(
       match: [/^([01]\d|2[0-3]):[0-5]\d$/, "Start time must use HH:mm (24-hour) format"],
     },
     location: { type: String, required: [true, "Please add a location"], trim: true },
+    // Optional end time on the same day, "HH:mm", later than startTime.
+    endTime: {
+      type: String,
+      default: null,
+      match: [/^([01]\d|2[0-3]):[0-5]\d$/, "End time must use HH:mm (24-hour) format"],
+    },
     // Optional banner image for the workshop card and detail page: an http(s) URL.
     coverImage: {
       type: String,

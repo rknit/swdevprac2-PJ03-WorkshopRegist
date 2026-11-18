@@ -858,6 +858,10 @@ select.field-control {
   color: var(--paper);
   box-shadow: none;
 }
+.chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .page-item:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -1326,6 +1330,13 @@ select.field-control {
 }
 .reg-meta .meta {
   gap: 6px;
+}
+.reg-note {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 .reg-actions {
   display: flex;

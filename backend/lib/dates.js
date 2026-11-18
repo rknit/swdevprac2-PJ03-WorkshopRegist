@@ -39,6 +39,13 @@ function parseStartTime(startTime) {
   return { given: true, startTime };
 }
 
+// Checks a start/end pair: an end time needs a start time and must be later.
+function checkTimeRange(startTime, endTime) {
+  if (endTime && !startTime) return { error: "Set a start time before the end time" };
+  if (startTime && endTime && endTime <= startTime) return { error: "End time must be later than start time" };
+  return {};
+}
+
 // Parses an optional banner image URL. undefined means "not given";
 // null or "" clears it. Only http(s) URLs are accepted.
 function parseCoverImage(coverImage) {
@@ -55,4 +62,4 @@ function parseCoverImage(coverImage) {
   return { given: true, coverImage: value };
 }
 
-module.exports = { bangkokTodayStart, parseWorkshopDate, parseStartTime, parseCoverImage };
+module.exports = { bangkokTodayStart, parseWorkshopDate, parseStartTime, parseCoverImage, checkTimeRange };

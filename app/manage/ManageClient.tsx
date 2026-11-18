@@ -16,11 +16,13 @@ type FormState = {
   location: string;
   capacity: string;
   coverImage: string;
+  startTime: string;
+  endTime: string;
 };
 type FormErrors = Partial<Record<keyof FormState, string>>;
 type Filter = "all" | "upcoming" | "ended" | "full";
 
-const EMPTY: FormState = { name: "", description: "", instructor: "", workshopDate: "", location: "", capacity: "", coverImage: "" };
+const EMPTY: FormState = { name: "", description: "", instructor: "", workshopDate: "", location: "", capacity: "", coverImage: "", startTime: "", endTime: "" };
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "upcoming", label: "Upcoming" },
@@ -28,6 +30,8 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "full", label: "Full" },
 ];
 const PAGE_SIZE = 5;
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 // Same rule as the backend: an http(s) URL.
 const isHttpUrl = (value: string) => {
@@ -310,6 +314,8 @@ const formFrom = (w: Workshop | null): FormState =>
         location: w.location,
         capacity: String(w.capacity),
         coverImage: w.coverImage ?? "",
+        startTime: w.startTime ?? "",
+        endTime: w.endTime ?? "",
       }
     : EMPTY;
 
@@ -351,6 +357,10 @@ function WorkshopForm({
     if (!/^\d{4}-\d{2}-\d{2}$/.test(form.workshopDate)) e.workshopDate = "Pick a date.";
     // The backend rejects any change to a past date. An edit that keeps the old date is allowed.
     else if (today && form.workshopDate < today && !(editing && bkkDay(editing.workshopDate) === form.workshopDate)) e.workshopDate = "Pick today or a later date.";
+    if (form.startTime && !HHMM.test(form.startTime)) e.startTime = "Use a 24-hour time, like 13:00.";
+    if (form.endTime && !HHMM.test(form.endTime)) e.endTime = "Use a 24-hour time, like 16:00.";
+    else if (form.endTime && !form.startTime) e.endTime = "Set a start time first.";
+    else if (form.endTime && form.startTime && form.endTime <= form.startTime) e.endTime = "End after the start time.";
     if (form.coverImage.trim() && !isHttpUrl(form.coverImage.trim())) e.coverImage = "Enter a full image link that starts with https://";
     const cap = Number(form.capacity);
     if (!Number.isInteger(cap) || cap < 1) e.capacity = "Enter a whole number, 1 or more.";
@@ -376,6 +386,8 @@ function WorkshopForm({
       location: form.location.trim(),
       capacity: Number(form.capacity),
       coverImage: form.coverImage.trim() || null,
+      startTime: form.startTime || null,
+      endTime: form.endTime || null,
     };
     // Send the date only when it changed, so an admin can still edit other fields of a past workshop.
     if (!editing || bkkDay(editing.workshopDate) !== form.workshopDate) body.workshopDate = form.workshopDate;
@@ -387,6 +399,8 @@ function WorkshopForm({
       const msg = errorText(err);
       if (/date/i.test(msg)) setErrors({ workshopDate: msg });
       else if (/capacity/i.test(msg)) setErrors({ capacity: msg });
+      else if (/end time|endTime/i.test(msg)) setErrors({ endTime: msg });
+      else if (/start time|startTime/i.test(msg)) setErrors({ startTime: msg });
       else if (/coverImage/i.test(msg)) setErrors({ coverImage: "Enter a full image link that starts with https://" });
       else setGeneral(msg);
       setBusy(false);
@@ -442,6 +456,10 @@ function WorkshopForm({
           </div>,
         )}
         {field("capacity", "Capacity", <input type="number" min={1} step={1} inputMode="numeric" {...attrs("capacity")} />)}
+      </div>
+      <div className="field-row">
+        {field("startTime", "Start time", <input type="time" step={60} {...attrs("startTime")} />)}
+        {field("endTime", "End time", <input type="time" step={60} {...attrs("endTime")} />)}
       </div>
       {field("location", "Location", <input {...attrs("location")} />)}
       {field("coverImage", "Banner image URL", <input type="url" inputMode="url" placeholder="https://" {...attrs("coverImage")} />)}
