@@ -16,15 +16,27 @@ export type Workshop = {
   description: string;
   instructor: string;
   workshopDate: string;
+  // Optional "HH:mm" start time, Asia/Bangkok.
+  startTime?: string | null;
   location: string;
   capacity: number;
   registeredCount?: number;
   isActive: boolean;
 };
 
+export type UserRow = {
+  _id: string;
+  name: string;
+  email: string;
+  tel: string;
+  role: "member" | "admin";
+  // Live count of registrations on active workshops (today or later).
+  activeSeats?: number;
+};
+
 export type Registration = {
   _id: string;
-  workshop: Pick<Workshop, "_id" | "name" | "description" | "instructor" | "workshopDate" | "location" | "capacity" | "isActive"> | null;
+  workshop: Pick<Workshop, "_id" | "name" | "description" | "instructor" | "workshopDate" | "startTime" | "location" | "capacity" | "registeredCount" | "isActive"> | null;
   user: { _id: string; name: string; email: string; tel: string; role: string } | null;
   createdAt: string;
 };
@@ -93,7 +105,7 @@ export const api = {
       body: JSON.stringify(userId ? { workshop: workshopId, user: userId } : { workshop: workshopId }),
     }),
   listUsers: () =>
-    request<{ success: true; count: number; data: { _id: string; name: string; email: string; tel: string; role: "member" | "admin" }[] }>("/api/v1/users"),
+    request<{ success: true; count: number; data: UserRow[] }>("/api/v1/users"),
   setRole: (userId: string, role: "member" | "admin") =>
     request<{ success: true; data: User }>(`/api/v1/users/${userId}/role`, { method: "PUT", body: JSON.stringify({ role }) }),
   updateRegistration: (id: string, workshopId: string) =>

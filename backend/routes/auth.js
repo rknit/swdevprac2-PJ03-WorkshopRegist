@@ -44,6 +44,11 @@
  *               "admin"
  *             ]
  *           },
+ *           "activeSeats": {
+ *             "type": "integer",
+ *             "minimum": 0,
+ *             "description": "Only in GET /api/v1/users. Live count of the user's registrations on active workshops (today or later, not deleted)."
+ *           },
  *           "createdAt": {
  *             "type": "string",
  *             "format": "date-time"
@@ -171,6 +176,13 @@
  *             "format": "date",
  *             "description": "Real calendar date in YYYY-MM-DD format; today or later in UTC."
  *           },
+ *           "startTime": {
+ *             "type": "string",
+ *             "nullable": true,
+ *             "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+ *             "example": "13:00",
+ *             "description": "Optional start time in HH:mm (24-hour), Asia/Bangkok time. Send null or an empty string to clear it."
+ *           },
  *           "location": {
  *             "type": "string",
  *             "example": "Training room A"
@@ -210,6 +222,13 @@
  *             "format": "date",
  *             "description": "Real calendar date in YYYY-MM-DD format; today or later in UTC."
  *           },
+ *           "startTime": {
+ *             "type": "string",
+ *             "nullable": true,
+ *             "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+ *             "example": "13:00",
+ *             "description": "Optional start time in HH:mm (24-hour), Asia/Bangkok time. Send null or an empty string to clear it."
+ *           },
  *           "location": {
  *             "type": "string",
  *             "example": "Training room A"
@@ -244,6 +263,11 @@
  *           "workshopDate": {
  *             "type": "string",
  *             "format": "date-time"
+ *           },
+ *           "startTime": {
+ *             "type": "string",
+ *             "nullable": true,
+ *             "example": "13:00"
  *           },
  *           "location": {
  *             "type": "string",

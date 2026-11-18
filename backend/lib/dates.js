@@ -28,4 +28,15 @@ function parseWorkshopDate(workshopDate) {
   return { date };
 }
 
-module.exports = { bangkokTodayStart, parseWorkshopDate };
+// Parses an optional "HH:mm" (24-hour, Bangkok time) start time.
+// undefined means "not given"; null or "" clears the time.
+function parseStartTime(startTime) {
+  if (startTime === undefined) return { given: false };
+  if (startTime === null || startTime === "") return { given: true, startTime: null };
+  if (typeof startTime !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime)) {
+    return { error: "startTime must use HH:mm (24-hour) format" };
+  }
+  return { given: true, startTime };
+}
+
+module.exports = { bangkokTodayStart, parseWorkshopDate, parseStartTime };

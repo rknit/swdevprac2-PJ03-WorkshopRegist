@@ -1,21 +1,23 @@
 const Workshop = require("../models/Workshop");
 const Registration = require("../models/Registration");
-const { bangkokTodayStart, parseWorkshopDate } = require("../lib/dates");
+const { bangkokTodayStart, parseWorkshopDate, parseStartTime } = require("../lib/dates");
 
 // A user may hold at most this many registrations on still-active workshops.
 const MAX_ACTIVE = 3;
 
 const todayBkk = () => bangkokTodayStart();
 
-const parseWorkshopInput = ({ workshopDate, capacity }) => {
+const parseWorkshopInput = ({ workshopDate, startTime, capacity }) => {
   const parsed = parseWorkshopDate(workshopDate);
   if (parsed.error) return parsed;
   const today = todayBkk();
   if (parsed.date < today) return { error: "Workshop date cannot be in the past" };
+  const time = parseStartTime(startTime);
+  if (time.error) return time;
   if (!Number.isInteger(capacity) || capacity < 1) {
     return { error: "Capacity must be a positive integer" };
   }
-  return { workshopDate: parsed.date, capacity };
+  return { workshopDate: parsed.date, startTime: time.given ? time.startTime : null, capacity };
 };
 
 const workshopFields = ({ name, description, instructor, location }) => ({ name, description, instructor, location });
@@ -76,6 +78,8 @@ exports.updateWorkshop = async (req, res, next) => {
       }
       dateChange = parsed.date;
     }
+    const time = parseStartTime(req.body.startTime);
+    if (time.error) return res.status(400).json({ success: false, error: time.error });
     let capacityChange = null;
     if (req.body.capacity !== undefined) {
       if (!Number.isInteger(req.body.capacity) || req.body.capacity < 1) {
@@ -88,6 +92,7 @@ exports.updateWorkshop = async (req, res, next) => {
     Object.keys(fields).forEach((key) => { if (fields[key] === undefined) delete fields[key]; });
     const update = { ...fields };
     if (dateChange) update.workshopDate = dateChange;
+    if (time.given) update.startTime = time.startTime;
     if (capacityChange !== null) {
       // Atomic capacity floor: the reduction only succeeds while the workshop
       // still holds at most the new capacity.

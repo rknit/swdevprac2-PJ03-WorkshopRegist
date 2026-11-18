@@ -6,6 +6,14 @@ const WorkshopSchema = new mongoose.Schema(
     description: { type: String, required: [true, "Please add a description"], trim: true },
     instructor: { type: String, required: [true, "Please add an instructor"], trim: true },
     workshopDate: { type: Date, required: [true, "Please add a workshop date"] },
+    // Optional start time on the workshop day, "HH:mm" in Asia/Bangkok time.
+    // It is kept apart from workshopDate so that every day-based rule
+    // (no past dates, no registration after the workshop date) stays unchanged.
+    startTime: {
+      type: String,
+      default: null,
+      match: [/^([01]\d|2[0-3]):[0-5]\d$/, "Start time must use HH:mm (24-hour) format"],
+    },
     location: { type: String, required: [true, "Please add a location"], trim: true },
     capacity: {
       type: Number,

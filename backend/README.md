@@ -134,12 +134,13 @@ Successful responses use `{ success: true, data }`, with `count` for lists. Regi
   "description": "Learn practical camera skills",
   "instructor": "Example Instructor",
   "workshopDate": "2026-12-01",
+  "startTime": "13:00",
   "location": "Training room A",
   "capacity": 20
 }
 ```
 
-Use a date that is today or later when trying this example.
+Use a date that is today or later when trying this example. `startTime` is optional. It uses `HH:mm` (24-hour) in Asia/Bangkok time and does not change any date rule.
 
 ### Registration Request Example
 

@@ -1,215 +1,272 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { api, fmtDate, type Registration, type Workshop } from "../../lib/api";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { api, type Registration, type Workshop } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { coverFor, dateDialog, dayTwoDigit, errorText, isPast, monthShort, onCover } from "../../lib/format";
+import { useToday } from "../../lib/hooks";
+import { ChangeWorkshopDialog, ConfirmDialog, moveTargets } from "../components/Dialogs";
+import { Button, ButtonLink, Icon, StatePanel } from "../components/ui";
+
+const MAX_ACTIVE = 3;
+type Tab = "upcoming" | "past";
+type RegWithWorkshop = Registration & { workshop: NonNullable<Registration["workshop"]> };
 
 export function AccountClient() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const router = useRouter();
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [result, setResult] = useState<{ ok: boolean; text: string; id: string | null } | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const today = useToday();
+  const [tab, setTab] = useState<Tab>("upcoming");
+  const [editing, setEditing] = useState<RegWithWorkshop | null>(null);
+  const [cancelling, setCancelling] = useState<RegWithWorkshop | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const [regs, ws] = await Promise.all([api.listRegistrations(), api.listWorkshops()]);
-      setRegistrations(regs.data);
-      setWorkshops(ws.data);
-      if (user?.role === "admin") {
-        const us = await api.listUsers();
-        setUsers(us.data);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoaded(true);
-    }
-  }, [user]);
-
+  // Admins manage every registration on their own page.
   useEffect(() => {
-    if (user) void load();
-    else setLoaded(true);
-  }, [user, load]);
+    if (!loading && user?.role === "admin") router.replace("/manage/registrations");
+  }, [loading, user, router]);
 
-  const changeWorkshop = async (id: string, newWorkshopId: string) => {
-    if (!newWorkshopId) return;
-    setBusyId(id);
-    setResult(null);
-    try {
-      const res = await api.updateRegistration(id, newWorkshopId);
-      setResult({ ok: true, text: `Registration ${id} moved to workshop ${res.data.workshop?.name ?? newWorkshopId}.`, id });
-      await load();
-    } catch (e) {
-      setResult({ ok: false, text: e instanceof Error ? e.message : String(e), id });
-    } finally {
-      setBusyId(null);
-    }
-  };
+  const load = useCallback(
+    () =>
+      Promise.all([api.listRegistrations(), api.listWorkshops()])
+        .then(
+          ([regs, ws]) => {
+            setRegistrations(regs.data);
+            setWorkshops(ws.data);
+            setError(null);
+          },
+          (e) => setError(errorText(e)),
+        )
+        .finally(() => setLoaded(true)),
+    [],
+  );
 
-  const del = async (id: string) => {
-    setBusyId(id);
-    setResult(null);
-    try {
-      await api.deleteRegistration(id);
-      setResult({ ok: true, text: `Registration ${id} deleted.`, id: null });
-      await load();
-    } catch (e) {
-      setResult({ ok: false, text: e instanceof Error ? e.message : String(e), id: null });
-    } finally {
-      setBusyId(null);
-    }
-  };
+  const isMember = user?.role === "member";
+  useEffect(() => {
+    if (isMember) void load();
+  }, [isMember, load]);
 
-  // Admins can create a registration for a named user.
-  const [users, setUsers] = useState<{ _id: string; name: string; email: string }[]>([]);
-  const [newUser, setNewUser] = useState("");
-  const [newWorkshop, setNewWorkshop] = useState("");
-  const [createBusy, setCreateBusy] = useState(false);
-  const [createResult, setCreateResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const { upcoming, past, removed } = useMemo(() => {
+    const withWorkshop = registrations.filter((r): r is RegWithWorkshop => r.workshop !== null);
+    const live = withWorkshop.filter((r) => r.workshop.isActive);
+    const byDate = (a: RegWithWorkshop, b: RegWithWorkshop) => Date.parse(a.workshop.workshopDate) - Date.parse(b.workshop.workshopDate);
+    return {
+      upcoming: today ? live.filter((r) => !isPast(r.workshop, today)).sort(byDate) : [],
+      past: today ? live.filter((r) => isPast(r.workshop, today)).sort((a, b) => byDate(b, a)) : [],
+      // Soft-deleted workshops: shown in Past so the member can still clear them.
+      removed: withWorkshop.filter((r) => !r.workshop.isActive).concat(registrations.filter((r) => r.workshop === null) as RegWithWorkshop[]),
+    };
+  }, [registrations, today]);
 
-  const submitCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUser || !newWorkshop) return;
-    setCreateBusy(true);
-    setCreateResult(null);
-    try {
-      const res = await api.createRegistration(newWorkshop, newUser);
-      setCreateResult({ ok: true, text: `Registration created for ${newUser}. id: ${res.data._id}` });
-      setNewWorkshop("");
-      await load();
-    } catch (err) {
-      setCreateResult({ ok: false, text: err instanceof Error ? err.message : String(err) });
-    } finally {
-      setCreateBusy(false);
-    }
-  };
-
-  if (!loaded) return <p>Loading…</p>;
-  if (!user) {
+  if (loading || (user?.role === "member" && !loaded)) {
     return (
-      <div>
-        <h1>My registrations</h1>
-        <p className="error">Log in to view registrations.</p>
+      <div className="page">
+        <h1 className="t-display-l">My registrations</h1>
+        <StatePanel title="Loading your registrations…" dashed />
       </div>
     );
   }
-  const isAdmin = user.role === "admin";
+
+  if (!user || user.role !== "member") {
+    if (user?.role === "admin") return null;
+    return (
+      <div className="page">
+        <h1 className="t-display-l">My registrations</h1>
+        <StatePanel title="Log in to see your registrations">
+          <ButtonLink href="/login?next=%2Faccount">Log in</ButtonLink>
+        </StatePanel>
+      </div>
+    );
+  }
+
+  const active = upcoming.length;
+  const free = Math.max(0, MAX_ACTIVE - active);
+  const held = new Set(registrations.map((r) => r.workshop?._id).filter(Boolean) as string[]);
+  const pastCount = past.length + removed.length;
 
   return (
-    <div>
-      <h1>{isAdmin ? "All registrations (admin)" : "My registrations"}</h1>
-      <p>
-        {isAdmin
-          ? "Admins can edit or delete any user's registration."
-          : "Members can edit or delete their own registrations. A member may have at most 3 active registrations, one per workshop."}
-      </p>
-      {error && <p className="error">{error}</p>}
-      {result && <p className={result.ok ? "ok" : "error"}>{result.text}</p>}
-      {registrations.length === 0 ? (
-        <p>No registrations yet.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Registration id</th>
-              {isAdmin && <th>User</th>}
-              <th>Workshop</th>
-              <th>Workshop date</th>
-              <th>Created</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {registrations.map((r) => (
-              <tr key={r._id}>
-                <td><code>{r._id}</code></td>
-                {isAdmin && (
-                  <td>
-                    {r.user ? (
-                      <>
-                        {r.user.name} ({r.user.email}) <code>{r.user._id}</code>
-                      </>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                )}
-                <td>
-                  {r.workshop ? (
-                    <>
-                      {r.workshop.name}{" "}
-                      <code>{r.workshop._id}</code>
-                    </>
-                  ) : (
-                    "deleted workshop"
-                  )}
-                </td>
-                <td>{r.workshop ? fmtDate(r.workshop.workshopDate) : "—"}</td>
-                <td>{fmtDate(r.createdAt)}</td>
-                <td>
-                  <label className="field" style={{ display: "inline-block", width: "10rem" }}>
-                    Move to
-                    <select id={`move-${r._id}`} defaultValue="">
-                      <option value="">—</option>
-                      {workshops.map((w) => (
-                        <option key={w._id} value={w._id}>
-                          {w.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>{" "}
-                  <button
-                    disabled={busyId === r._id}
-                    onClick={() =>
-                      void changeWorkshop(r._id, (document.getElementById(`move-${r._id}`) as HTMLSelectElement | null)?.value ?? "")
-                    }
-                  >
-                    Edit
-                  </button>{" "}
-                  <button disabled={busyId === r._id} onClick={() => void del(r._id)}>
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="page">
+      <div className="page-head">
+        <h1 className="t-display-l">My registrations</h1>
+        <div className="seat-meter" aria-label={`Active seats: ${active} of ${MAX_ACTIVE}`}>
+          <span className="t-label">Active seats</span>
+          <div className="seat-slots">
+            {Array.from({ length: MAX_ACTIVE }, (_, i) =>
+              i < active ? (
+                <span key={i} className="seat-slot" aria-hidden>
+                  {i + 1}
+                </span>
+              ) : (
+                <span key={i} className="seat-slot is-free" aria-hidden>
+                  free
+                </span>
+              ),
+            )}
+            <span className="t-heading-m" aria-hidden>
+              {active} / {MAX_ACTIVE}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="chips" role="tablist" aria-label="Registrations">
+        <button type="button" role="tab" id="tab-upcoming" aria-controls="panel-upcoming" className="chip" aria-selected={tab === "upcoming"} onClick={() => setTab("upcoming")}>
+          Upcoming ({upcoming.length})
+        </button>
+        <button type="button" role="tab" id="tab-past" aria-controls="panel-past" className="chip" aria-selected={tab === "past"} onClick={() => setTab("past")}>
+          Past ({pastCount})
+        </button>
+      </div>
+
+      {error && (
+        <p className="notice notice-error" role="alert">
+          {error}
+        </p>
       )}
-      {isAdmin && (
-        <div className="card">
-          <h2>Create a registration for a user</h2>
-          <p>Pick the user by ID (listed in the table above) and the workshop.</p>
-          {createResult && <p className={createResult.ok ? "ok" : "error"}>{createResult.text}</p>}
-          <form onSubmit={(e) => void submitCreate(e)} className="row">
-            <label className="field">
-              User ID
-              <select value={newUser} onChange={(e) => setNewUser(e.target.value)} required>
-                <option value="">—</option>
-                {users.map((u) => (
-                  <option key={u._id} value={u._id}>
-                    {u.name} ({u.email})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              Workshop
-              <select value={newWorkshop} onChange={(e) => setNewWorkshop(e.target.value)} required>
-                <option value="">—</option>
-                {workshops.map((w) => (
-                  <option key={w._id} value={w._id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="submit" disabled={createBusy}>{createBusy ? "Creating…" : "Create"}</button>
-          </form>
+      <p className="sr-only" role="status">
+        {notice ?? ""}
+      </p>
+
+      {tab === "upcoming" ? (
+        <div id="panel-upcoming" role="tabpanel" aria-labelledby="tab-upcoming" className="reg-list">
+          {upcoming.map((r) => (
+            <RegRow key={r._id} reg={r}>
+              <Button variant="mint" onClick={() => setEditing(r)} aria-label={`Change workshop for ${r.workshop.name}`}>
+                Edit
+              </Button>
+              <Button variant="secondary" onClick={() => setCancelling(r)} aria-label={`Cancel seat in ${r.workshop.name}`}>
+                Cancel
+              </Button>
+            </RegRow>
+          ))}
+          {free > 0 && (
+            <div className="panel-dashed free-slot">
+              <span className="free-slot-plus t-heading-m" aria-hidden>
+                +
+              </span>
+              <div style={{ flex: "1 1 0", minWidth: 200, display: "flex", flexDirection: "column", gap: 4 }}>
+                <p className="t-heading-s">
+                  You have {free} free slot{free === 1 ? "" : "s"}
+                </p>
+                <p className="muted">{active === 0 ? "Browse workshops and grab a seat." : `Browse workshops and grab ${free === 1 ? "one more seat" : "more seats"}.`}</p>
+              </div>
+              <ButtonLink href="/" variant="dark">
+                Browse workshops
+              </ButtonLink>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div id="panel-past" role="tabpanel" aria-labelledby="tab-past" className="reg-list" style={{ gap: 20 }}>
+          {pastCount === 0 && <StatePanel title="No past workshops yet" dashed />}
+          {past.map((r) => (
+            <RegRow key={r._id} reg={r} past />
+          ))}
+          {removed.map((r) => (
+            <RegRow key={r._id} reg={r} past removed>
+              <Button variant="secondary" onClick={() => setCancelling(r)}>
+                Remove
+              </Button>
+            </RegRow>
+          ))}
         </div>
       )}
+
+      <ChangeWorkshopDialog
+        open={editing !== null}
+        currentName={editing?.workshop.name ?? ""}
+        targets={editing && today ? moveTargets(workshops, today, held) : []}
+        onClose={() => setEditing(null)}
+        onSave={async (workshopId) => {
+          if (!editing) return;
+          const res = await api.updateRegistration(editing._id, workshopId);
+          setEditing(null);
+          setNotice(`Your seat moved to ${res.data.workshop?.name ?? "the new workshop"}.`);
+          await load();
+        }}
+      />
+
+      <ConfirmDialog
+        open={cancelling !== null}
+        title="Cancel this seat?"
+        body={
+          cancelling?.workshop ? (
+            <>
+              You will lose your seat in <strong>{cancelling.workshop.name}</strong> ({dateDialog(cancelling.workshop.workshopDate)}).
+            </>
+          ) : (
+            "This registration will be removed."
+          )
+        }
+        safeLabel="Keep my seat"
+        dangerLabel="Yes, cancel"
+        onClose={() => setCancelling(null)}
+        onConfirm={async () => {
+          if (!cancelling) return;
+          await api.deleteRegistration(cancelling._id);
+          setCancelling(null);
+          setNotice("Your seat was cancelled.");
+          await load();
+        }}
+      />
+    </div>
+  );
+}
+
+// Figma: one registration row — date block, title and meta, actions.
+function RegRow({ reg, past = false, removed = false, children }: { reg: RegWithWorkshop; past?: boolean; removed?: boolean; children?: React.ReactNode }) {
+  const w = reg.workshop;
+  if (!w) {
+    return (
+      <div className="reg-row is-past">
+        <div className="reg-main">
+          <p className="t-heading-s">Workshop removed</p>
+        </div>
+        {children && <div className="reg-actions">{children}</div>}
+      </div>
+    );
+  }
+  const cover = coverFor(w._id);
+  const bg = past ? "var(--mist)" : cover.bg;
+  return (
+    <div className={past ? "reg-row is-past" : "reg-row"}>
+      <div className="reg-date" style={{ background: bg, color: onCover(bg) }} aria-hidden>
+        <span className="t-label">{monthShort(w.workshopDate)}</span>
+        <span className="t-display-l">{dayTwoDigit(w.workshopDate)}</span>
+      </div>
+      <div className="reg-main">
+        {removed ? (
+          <p className="t-heading-s">{w.name} (removed by an admin)</p>
+        ) : (
+          <Link href={`/workshop/${w._id}`} className="t-heading-s">
+            {w.name}
+          </Link>
+        )}
+        <span className="sr-only">{dateDialog(w.workshopDate)}</span>
+        <div className="reg-meta">
+          <span className="meta">
+            <Icon name="user" size={18} />
+            <span>{w.instructor}</span>
+          </span>
+          {w.startTime && (
+            <span className="meta">
+              <Icon name="clock" size={18} />
+              <span>{w.startTime}</span>
+            </span>
+          )}
+          <span className="meta">
+            <Icon name="pin" size={18} />
+            <span>{w.location}</span>
+          </span>
+        </div>
+      </div>
+      {children && <div className="reg-actions">{children}</div>}
     </div>
   );
 }

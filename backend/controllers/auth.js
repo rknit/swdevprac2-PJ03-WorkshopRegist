@@ -24,6 +24,11 @@ exports.register = async (req, res, next) => {
     const user = await User.create({ name, email, tel, password, role: "member" });
     sendTokenResponse(user, 201, res);
   } catch (error) {
+    // The unique email index rejects a second account; say so plainly
+    // instead of passing on the raw database message.
+    if (error.code === 11000 && error.keyPattern && error.keyPattern.email) {
+      return res.status(409).json({ success: false, error: "This email is already in use." });
+    }
     next(error);
   }
 };
